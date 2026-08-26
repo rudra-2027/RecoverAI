@@ -1,7 +1,7 @@
-package com.recoverai.recoverai.service.impl;
+package com.recoverai.recoverai.service;
 
-public abstract class AuditService {
-    abstract void log(
+public interface  AuditService {
+     void log(
             String mandateId,
             String stage,
             String message) ;

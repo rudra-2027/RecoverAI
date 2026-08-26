@@ -1,7 +1,8 @@
-package com.recoverai.recoverai.service;
+package com.recoverai.recoverai.service.impl;
 
 import com.recoverai.recoverai.dto.AnalysisResult;
-import com.recoverai.recoverai.service.impl.SimulationService;
+import com.recoverai.recoverai.entity.RecoveryOutcomeStatus;
+import com.recoverai.recoverai.service.SimulationService;
 import org.springframework.stereotype.Service;
 
 import java.util.Random;
@@ -20,9 +21,8 @@ public class SimulationServiceImpl
         double probability =
                 analysis.recoveryProbability();
 
-        return random.nextDouble()
-                < probability
-                ? "RECOVERED"
-                : "FAILED";
+        return random.nextDouble() < probability
+                ? RecoveryOutcomeStatus.SUCCESS.name()
+                : RecoveryOutcomeStatus.FAILED.name();
     }
 }

@@ -1,8 +1,8 @@
-package com.recoverai.recoverai.service;
+package com.recoverai.recoverai.service.impl;
 
 import com.recoverai.recoverai.dto.AnalysisResult;
 import com.recoverai.recoverai.entity.FailedMandate;
-import com.recoverai.recoverai.service.impl.FailureAnalysisService;
+import com.recoverai.recoverai.service.FailureAnalysisService;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -27,6 +27,9 @@ public class FailureAnalysisServiceImpl
             case "BANK_SERVER_DOWN",
                  "NPCI_TIMEOUT" ->
                     classification = "TD";
+
+            case "CARD_EXPIRED" ->
+                    classification = "CUSTOMER_ACTION_REQUIRED";
 
             default ->
                     classification = "PERMANENT";

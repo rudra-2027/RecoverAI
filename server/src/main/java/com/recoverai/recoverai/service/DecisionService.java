@@ -1,4 +1,4 @@
-package com.recoverai.recoverai.service.impl;
+package com.recoverai.recoverai.service;
 
 import com.recoverai.recoverai.dto.AnalysisResult;
 import com.recoverai.recoverai.dto.DecisionResult;

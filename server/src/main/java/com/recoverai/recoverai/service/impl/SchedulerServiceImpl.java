@@ -1,7 +1,7 @@
-package com.recoverai.recoverai.service;
+package com.recoverai.recoverai.service.impl;
 
 import com.recoverai.recoverai.dto.AnalysisResult;
-import com.recoverai.recoverai.service.impl.SchedulerService;
+import com.recoverai.recoverai.service.SchedulerService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
