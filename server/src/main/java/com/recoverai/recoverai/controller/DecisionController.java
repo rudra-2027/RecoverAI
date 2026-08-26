@@ -1,0 +1,92 @@
+package com.recoverai.recoverai.controller;
+
+import com.recoverai.recoverai.agent.RevenueRecoveryAgent;
+import com.recoverai.recoverai.dto.DecisionOverrideRequest;
+import com.recoverai.recoverai.dto.ProcessBatchDecisionsRequest;
+import com.recoverai.recoverai.dto.RecoveryResult;
+import com.recoverai.recoverai.entity.FailedMandate;
+import com.recoverai.recoverai.entity.RecoveryDecision;
+import com.recoverai.recoverai.exception.ResourceNotFoundException;
+import com.recoverai.recoverai.repository.FailedMandateRepository;
+import com.recoverai.recoverai.repository.RecoveryDecisionRepository;
+import com.recoverai.recoverai.service.AuditService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/decisions")
+public class DecisionController {
+    private final RecoveryDecisionRepository decisionRepository;
+    private final FailedMandateRepository failedMandateRepository;
+    private final RevenueRecoveryAgent revenueRecoveryAgent;
+    private final AuditService auditService;
+
+    @GetMapping
+    public List<RecoveryDecision> all() {
+        return decisionRepository.findAll();
+    }
+
+    @GetMapping("/{mandateId}")
+    public List<RecoveryDecision> byMandate(@PathVariable String mandateId) {
+        return decisionRepository.findByMandateIdOrderByCreatedAtDesc(mandateId);
+    }
+
+    @PutMapping("/{mandateId}/override")
+    public RecoveryDecision override(
+            @PathVariable String mandateId,
+            @Valid @RequestBody DecisionOverrideRequest request) {
+        FailedMandate mandate = failedMandateRepository.findByMandateId(mandateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Mandate not found: " + mandateId));
+
+        RecoveryDecision decision = RecoveryDecision.builder()
+                .mandateId(mandate.getMandateId())
+                .classification(request.classification())
+                .recoverabilityScore(request.recoverabilityScore())
+                .action(request.action().name())
+                .decisionReasonCode("MANUAL_OVERRIDE")
+                .scheduledAt(request.scheduledAt())
+                .stopReason(request.stopReason())
+                .escalated(Boolean.TRUE.equals(request.escalated()))
+                .escalationReason(request.reason() == null ? request.escalationReason() : request.reason())
+                .manualOverride(true)
+                .confirmed(true)
+                .confirmedAt(LocalDateTime.now())
+                .decisionTimestamp(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
+                .build();
+        RecoveryDecision saved = decisionRepository.save(decision);
+        auditService.log(mandateId, "DECISION", "Manual override applied: " + request.action().name());
+        return saved;
+    }
+
+    @PostMapping("/{mandateId}/confirm")
+    public RecoveryDecision confirm(@PathVariable String mandateId) {
+        RecoveryDecision decision = decisionRepository.findTopByMandateIdOrderByCreatedAtDesc(mandateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Decision not found for mandate: " + mandateId));
+        decision.setConfirmed(true);
+        decision.setConfirmedAt(LocalDateTime.now());
+        RecoveryDecision saved = decisionRepository.save(decision);
+        auditService.log(mandateId, "DECISION", "AI plan confirmed");
+        return saved;
+    }
+
+    @PostMapping("/process-batch")
+    public List<RecoveryResult> processBatch(@Valid @RequestBody ProcessBatchDecisionsRequest request) {
+        return request.mandateIds().stream()
+                .map(mandateId -> failedMandateRepository.findByMandateId(mandateId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Mandate not found: " + mandateId)))
+                .map(revenueRecoveryAgent::run)
+                .toList();
+    }
+}
