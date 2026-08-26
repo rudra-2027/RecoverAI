@@ -30,10 +30,26 @@ public class RecoveryDecision {
     @Column(length = 50)
     private String action;
 
+    @Column(name = "decision_reason_code", length = 100)
+    private String decisionReasonCode;
+
     @Column(name = "scheduled_at")
     private LocalDateTime scheduledAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "stop_reason", length = 100)
+    private StopReason stopReason;
+
+    @Column(name = "escalated")
+    private Boolean escalated = false;
+
+    @Column(name = "escalation_reason", length = 255)
+    private String escalationReason;
+
     @Column(name = "decision_timestamp")
     private LocalDateTime decisionTimestamp;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
     
 }

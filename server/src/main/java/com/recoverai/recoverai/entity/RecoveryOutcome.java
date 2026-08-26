@@ -25,6 +25,12 @@ public class RecoveryOutcome {
     @Column(name = "recovered_amount", precision = 12, scale = 2)
     private BigDecimal recoveredAmount;
 
+    @Column(name = "transaction_id", length = 100)
+    private String transactionId;
+
+    @Column(name = "simulation_reason", length = 255)
+    private String simulationReason;
+
     @Column(name = "outcome_timestamp")
     private LocalDateTime outcomeTimestamp;
 

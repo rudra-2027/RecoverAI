@@ -19,6 +19,9 @@ public class PaymentHistory {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "merchant_id", length = 100)
+    private String merchantId;
+
     @Column(name = "mandate_id", nullable = false, length = 100)
     private String mandateId;
 
@@ -39,5 +42,8 @@ public class PaymentHistory {
 
     @Column(name = "transaction_time")
     private LocalDateTime transactionTime;
+
+    @Column(name = "payment_date")
+    private LocalDateTime paymentDate;
 
 }
