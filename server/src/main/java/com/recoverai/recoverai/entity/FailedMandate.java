@@ -21,6 +21,9 @@ public class FailedMandate {
     @Column(name = "merchant_id", length = 100)
     private String merchantId;
 
+    @Column(name = "batch_run_id")
+    private Long batchRunId;
+
     @Column(name = "mandate_id", nullable = false, length = 100)
     private String mandateId;
 

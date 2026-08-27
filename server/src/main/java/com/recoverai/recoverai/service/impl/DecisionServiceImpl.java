@@ -2,12 +2,12 @@ package com.recoverai.recoverai.service.impl;
 
 import com.recoverai.recoverai.dto.AnalysisResult;
 import com.recoverai.recoverai.dto.DecisionResult;
-import com.recoverai.recoverai.config.RecoverAiProperties;
 import com.recoverai.recoverai.entity.FailedMandate;
 import com.recoverai.recoverai.entity.RecoveryAction;
 import com.recoverai.recoverai.entity.StopReason;
 import com.recoverai.recoverai.service.DecisionService;
 import com.recoverai.recoverai.service.RetryStrategyService;
+import com.recoverai.recoverai.service.RuntimeSettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DecisionServiceImpl
         implements DecisionService {
-    private final RecoverAiProperties properties;
+    private final RuntimeSettingsService runtimeSettingsService;
     private final RetryStrategyService retryStrategyService;
 
     @Override
@@ -41,7 +41,7 @@ public class DecisionServiceImpl
         if (safeRetryCount(mandate) >= maxRetries(mandate)) {
             return stopped(StopReason.MAX_RETRIES_REACHED, "MAX_RETRIES_REACHED");
         }
-        if (analysis.recoverabilityScore() < properties.escalateBelowProbability()) {
+        if (analysis.recoverabilityScore() < runtimeSettingsService.escalateBelowProbability()) {
             return new DecisionResult(
                     RecoveryAction.ESCALATE.name(),
                     null,
@@ -75,6 +75,6 @@ public class DecisionServiceImpl
     }
 
     private int maxRetries(FailedMandate mandate) {
-        return mandate.getMaxRetries() == null ? properties.maxRetries() : mandate.getMaxRetries();
+        return mandate.getMaxRetries() == null ? runtimeSettingsService.maxRetries() : mandate.getMaxRetries();
     }
 }

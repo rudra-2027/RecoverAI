@@ -24,6 +24,18 @@ public class BatchRun {
     private Integer successfulRecoveries;
     private Integer failedRecoveries;
 
+    @Column(length = 255)
+    private String sourceFileName;
+
+    @Column(length = 30)
+    private String sourceType;
+
+    @Column(length = 30)
+    private String status;
+
+    @Column(columnDefinition = "TEXT")
+    private String errorMessage;
+
     @Column(precision = 14, scale = 2)
     private BigDecimal recoveredRevenue;
 }

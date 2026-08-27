@@ -1,5 +1,6 @@
 package com.recoverai.recoverai.config;
 
+import com.recoverai.recoverai.service.RuntimeSettingsService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -12,11 +13,11 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class ApiKeyInterceptor implements HandlerInterceptor {
     private static final String HEADER = "X-API-Key";
 
-    private final RecoverAiProperties properties;
+    private final RuntimeSettingsService runtimeSettingsService;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        String configuredKey = properties.apiKey();
+        String configuredKey = runtimeSettingsService.apiKey();
         if (configuredKey == null || configuredKey.isBlank()) {
             return true;
         }

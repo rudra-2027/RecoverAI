@@ -46,6 +46,15 @@ public class RecoveryDecision {
     @Column(name = "escalation_reason", length = 255)
     private String escalationReason;
 
+    @Column(name = "confirmed")
+    private Boolean confirmed = false;
+
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
+
+    @Column(name = "manual_override")
+    private Boolean manualOverride = false;
+
     @Column(name = "decision_timestamp")
     private LocalDateTime decisionTimestamp;
 
