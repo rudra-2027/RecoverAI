@@ -5,6 +5,7 @@ import com.recoverai.recoverai.repository.FailedMandateRepository;
 import com.recoverai.recoverai.repository.MerchantRepository;
 import com.recoverai.recoverai.repository.PaymentHistoryRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.util.Random;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class DataSeeder implements CommandLineRunner {
     private static final List<String> FAILURE_REASONS = List.of(
             "INSUFFICIENT_BALANCE",
@@ -33,6 +35,7 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        log.info("Starting demo data seeding");
         seedMerchant();
         if (failedMandateRepository.count() == 0) {
             seedFailedMandates();
@@ -40,6 +43,7 @@ public class DataSeeder implements CommandLineRunner {
         if (paymentHistoryRepository.count() == 0) {
             seedPaymentHistory();
         }
+        log.info("Demo data seeding completed");
     }
 
     private void seedMerchant() {
@@ -56,6 +60,7 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedFailedMandates() {
+        log.info("Seeding demo failed mandates");
         for (int i = 1; i <= 100; i++) {
             String reason = FAILURE_REASONS.get(random.nextInt(FAILURE_REASONS.size()));
             failedMandateRepository.save(FailedMandate.builder()
@@ -78,6 +83,7 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedPaymentHistory() {
+        log.info("Seeding demo payment history");
         for (int i = 1; i <= 500; i++) {
             PaymentStatus status = random.nextInt(10) < 8 ? PaymentStatus.SUCCESS : PaymentStatus.FAILED;
             paymentHistoryRepository.save(PaymentHistory.builder()

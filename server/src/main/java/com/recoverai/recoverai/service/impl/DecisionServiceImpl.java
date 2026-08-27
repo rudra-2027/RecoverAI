@@ -9,10 +9,12 @@ import com.recoverai.recoverai.service.DecisionService;
 import com.recoverai.recoverai.service.RetryStrategyService;
 import com.recoverai.recoverai.service.RuntimeSettingsService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DecisionServiceImpl
         implements DecisionService {
     private final RuntimeSettingsService runtimeSettingsService;
@@ -24,12 +26,15 @@ public class DecisionServiceImpl
             AnalysisResult analysis) {
 
         if ("MANDATE_REVOKED".equals(mandate.getFailureReason())) {
+            log.info("Decision stopped for mandateId={} because mandate was revoked", mandate.getMandateId());
             return stopped(StopReason.MANDATE_REVOKED, "MANDATE_REVOKED");
         }
         if ("MANDATE_EXPIRED".equals(mandate.getFailureReason())) {
+            log.info("Decision stopped for mandateId={} because mandate was expired", mandate.getMandateId());
             return stopped(StopReason.MANDATE_EXPIRED, "MANDATE_EXPIRED");
         }
         if ("CARD_EXPIRED".equals(mandate.getFailureReason())) {
+            log.info("Decision requires customer notification for mandateId={} because card expired", mandate.getMandateId());
             return new DecisionResult(
                     RecoveryAction.NOTIFY_CUSTOMER.name(),
                     null,
@@ -39,9 +44,12 @@ public class DecisionServiceImpl
                     "CARD_EXPIRED_NOTIFY_CUSTOMER");
         }
         if (safeRetryCount(mandate) >= maxRetries(mandate)) {
+            log.info("Decision stopped for mandateId={} because max retries reached", mandate.getMandateId());
             return stopped(StopReason.MAX_RETRIES_REACHED, "MAX_RETRIES_REACHED");
         }
         if (analysis.recoverabilityScore() < runtimeSettingsService.escalateBelowProbability()) {
+            log.info("Decision escalated for mandateId={} score={} threshold={}",
+                    mandate.getMandateId(), analysis.recoverabilityScore(), runtimeSettingsService.escalateBelowProbability());
             return new DecisionResult(
                     RecoveryAction.ESCALATE.name(),
                     null,

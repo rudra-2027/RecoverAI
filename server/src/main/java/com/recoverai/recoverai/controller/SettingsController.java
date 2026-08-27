@@ -15,6 +15,7 @@ import com.recoverai.recoverai.repository.RecoveryOutcomeRepository;
 import com.recoverai.recoverai.service.RuntimeSettingsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,6 +28,7 @@ import java.time.LocalDateTime;
 
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping("/api/settings")
 public class SettingsController {
     private final RuntimeSettingsService runtimeSettingsService;
@@ -43,6 +45,7 @@ public class SettingsController {
 
     @PutMapping("/recovery")
     public RecoverySettingsResponse updateRecoverySettings(@Valid @RequestBody RecoverySettingsRequest request) {
+        log.info("Updating recovery settings");
         return runtimeSettingsService.updateRecoverySettings(request);
     }
 
@@ -50,6 +53,7 @@ public class SettingsController {
     public Merchant updateMerchant(
             @PathVariable String merchantId,
             @Valid @RequestBody MerchantSettingsRequest request) {
+        log.info("Updating merchant settings merchantId={}", merchantId);
         Merchant merchant = merchantRepository.findByMerchantId(merchantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Merchant not found: " + merchantId));
         if (request.active() != null) {
@@ -82,6 +86,7 @@ public class SettingsController {
 
     @PostMapping("/api-key/regenerate")
     public ApiKeyRegenerateResponse regenerateApiKey() {
+        log.warn("Runtime API key regeneration requested");
         String apiKey = runtimeSettingsService.regenerateApiKey();
         return new ApiKeyRegenerateResponse(apiKey, "Runtime API key regenerated. Use this value in X-API-Key for future requests.");
     }

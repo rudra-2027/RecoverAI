@@ -12,6 +12,7 @@ import com.recoverai.recoverai.repository.RecoveryDecisionRepository;
 import com.recoverai.recoverai.service.AuditService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +26,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping("/api/decisions")
 public class DecisionController {
     private final RecoveryDecisionRepository decisionRepository;
@@ -46,6 +48,7 @@ public class DecisionController {
     public RecoveryDecision override(
             @PathVariable String mandateId,
             @Valid @RequestBody DecisionOverrideRequest request) {
+        log.info("Manual decision override requested for mandateId={}, action={}", mandateId, request.action());
         FailedMandate mandate = failedMandateRepository.findByMandateId(mandateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Mandate not found: " + mandateId));
 
@@ -66,23 +69,27 @@ public class DecisionController {
                 .createdAt(LocalDateTime.now())
                 .build();
         RecoveryDecision saved = decisionRepository.save(decision);
+        log.info("Manual decision override saved for mandateId={}, decisionId={}", mandateId, saved.getId());
         auditService.log(mandateId, "DECISION", "Manual override applied: " + request.action().name());
         return saved;
     }
 
     @PostMapping("/{mandateId}/confirm")
     public RecoveryDecision confirm(@PathVariable String mandateId) {
+        log.info("Decision confirmation requested for mandateId={}", mandateId);
         RecoveryDecision decision = decisionRepository.findTopByMandateIdOrderByCreatedAtDesc(mandateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Decision not found for mandate: " + mandateId));
         decision.setConfirmed(true);
         decision.setConfirmedAt(LocalDateTime.now());
         RecoveryDecision saved = decisionRepository.save(decision);
+        log.info("Decision confirmed for mandateId={}, decisionId={}", mandateId, saved.getId());
         auditService.log(mandateId, "DECISION", "AI plan confirmed");
         return saved;
     }
 
     @PostMapping("/process-batch")
     public List<RecoveryResult> processBatch(@Valid @RequestBody ProcessBatchDecisionsRequest request) {
+        log.info("Decision batch processing requested for {} mandates", request.mandateIds().size());
         return request.mandateIds().stream()
                 .map(mandateId -> failedMandateRepository.findByMandateId(mandateId)
                         .orElseThrow(() -> new ResourceNotFoundException("Mandate not found: " + mandateId)))

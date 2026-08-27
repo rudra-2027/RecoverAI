@@ -8,6 +8,7 @@ import com.recoverai.recoverai.entity.FailedMandate;
 import com.recoverai.recoverai.repository.BatchRunRepository;
 import com.recoverai.recoverai.repository.FailedMandateRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -16,6 +17,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BatchProcessingServiceImpl implements com.recoverai.recoverai.service.BatchProcessingService {
     private final FailedMandateRepository failedMandateRepository;
     private final BatchRunRepository batchRunRepository;
@@ -23,6 +25,7 @@ public class BatchProcessingServiceImpl implements com.recoverai.recoverai.servi
 
     @Override
     public BatchRunResult runAllFailedMandates() {
+        log.info("Starting batch recovery run for all failed mandates");
         BatchRun batchRun = BatchRun.builder()
                 .startedAt(LocalDateTime.now())
                 .recoveredRevenue(BigDecimal.ZERO)
@@ -34,12 +37,15 @@ public class BatchProcessingServiceImpl implements com.recoverai.recoverai.servi
         batchRunRepository.save(batchRun);
 
         List<FailedMandate> mandates = failedMandateRepository.findAll();
+        log.info("Batch run id={} loaded {} mandates", batchRun.getId(), mandates.size());
         int successes = 0;
         int failures = 0;
         BigDecimal recoveredRevenue = BigDecimal.ZERO;
 
         for (FailedMandate mandate : mandates) {
             RecoveryResult result = revenueRecoveryAgent.run(mandate);
+            log.debug("Batch run id={} processed mandateId={} with outcome={}",
+                    batchRun.getId(), mandate.getMandateId(), result.outcome());
             if ("SUCCESS".equals(result.outcome())) {
                 successes++;
                 recoveredRevenue = recoveredRevenue.add(mandate.getAmount());
@@ -55,6 +61,8 @@ public class BatchProcessingServiceImpl implements com.recoverai.recoverai.servi
         batchRun.setRecoveredRevenue(recoveredRevenue);
         batchRun.setStatus("COMPLETED");
         batchRunRepository.save(batchRun);
+        log.info("Completed batch run id={} total={} successes={} failures={} recoveredRevenue={}",
+                batchRun.getId(), mandates.size(), successes, failures, recoveredRevenue);
 
         double recoveryRate = mandates.isEmpty() ? 0.0 : (successes * 100.0) / mandates.size();
         return new BatchRunResult(batchRun.getId(), mandates.size(), successes, failures, recoveredRevenue, recoveryRate, batchRun.getStatus());

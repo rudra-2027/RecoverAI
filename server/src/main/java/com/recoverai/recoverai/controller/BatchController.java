@@ -7,6 +7,7 @@ import com.recoverai.recoverai.exception.ResourceNotFoundException;
 import com.recoverai.recoverai.repository.BatchRunRepository;
 import com.recoverai.recoverai.service.BatchFileService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -23,6 +24,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping("/api/batches")
 public class BatchController {
     private final BatchRunRepository batchRunRepository;
@@ -43,16 +45,19 @@ public class BatchController {
     public BatchUploadResult upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam(name = "process", defaultValue = "false") boolean process) {
+        log.info("Batch upload requested fileName={}, process={}", file.getOriginalFilename(), process);
         return batchFileService.upload(file, process);
     }
 
     @PostMapping("/{id}/run")
     public BatchRunResult runBatch(@PathVariable Long id) {
+        log.info("Batch run requested for batchRunId={}", id);
         return batchFileService.runBatch(id);
     }
 
     @GetMapping("/{id}/report")
     public ResponseEntity<byte[]> exportReport(@PathVariable Long id) {
+        log.info("Batch report export requested for batchRunId={}", id);
         byte[] report = batchFileService.exportReport(id);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()

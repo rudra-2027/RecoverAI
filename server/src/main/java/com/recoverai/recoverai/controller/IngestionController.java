@@ -13,6 +13,7 @@ import com.recoverai.recoverai.repository.MerchantRepository;
 import com.recoverai.recoverai.repository.PaymentHistoryRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -25,6 +26,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping("/api/ingest")
 public class IngestionController {
     private final MerchantRepository merchantRepository;
@@ -35,6 +37,7 @@ public class IngestionController {
     @PostMapping("/merchants")
     @ResponseStatus(HttpStatus.CREATED)
     public Merchant createMerchant(@Valid @RequestBody CreateMerchantRequest request) {
+        log.info("Creating merchant merchantId={}", request.merchantId());
         Merchant merchant = Merchant.builder()
                 .merchantId(request.merchantId())
                 .merchantName(request.merchantName())
@@ -44,7 +47,9 @@ public class IngestionController {
                 .active(request.active() == null || request.active())
                 .createdAt(LocalDateTime.now())
                 .build();
-        return merchantRepository.save(merchant);
+        Merchant saved = merchantRepository.save(merchant);
+        log.info("Merchant created merchantId={}, id={}", saved.getMerchantId(), saved.getId());
+        return saved;
     }
 
     @GetMapping("/merchants")
@@ -55,6 +60,7 @@ public class IngestionController {
     @PostMapping("/failed-mandates")
     @ResponseStatus(HttpStatus.CREATED)
     public FailedMandate createFailedMandate(@Valid @RequestBody CreateFailedMandateRequest request) {
+        log.info("Creating failed mandate mandateId={}, merchantId={}", request.mandateId(), request.merchantId());
         FailedMandate mandate = FailedMandate.builder()
                 .merchantId(request.merchantId())
                 .customerId(request.customerId())
@@ -71,7 +77,9 @@ public class IngestionController {
                 .escalated(false)
                 .createdAt(LocalDateTime.now())
                 .build();
-        return failedMandateRepository.save(mandate);
+        FailedMandate saved = failedMandateRepository.save(mandate);
+        log.info("Failed mandate created mandateId={}, id={}", saved.getMandateId(), saved.getId());
+        return saved;
     }
 
     @GetMapping("/failed-mandates")
@@ -81,6 +89,7 @@ public class IngestionController {
 
     @GetMapping("/failed-mandates/export")
     public ResponseEntity<byte[]> exportFailedMandates() {
+        log.info("Failed mandates export requested");
         StringBuilder csv = new StringBuilder();
         csv.append("id,merchantId,customerId,mandateId,amount,failureReason,failureCode,retryCount,maxRetries,status,mandateStatus,nextRetryAt,stopReason,escalated,createdAt\n");
         for (FailedMandate mandate : failedMandateRepository.findAll()) {
@@ -110,6 +119,7 @@ public class IngestionController {
     @PostMapping("/payment-history")
     @ResponseStatus(HttpStatus.CREATED)
     public PaymentHistory createPaymentHistory(@Valid @RequestBody CreatePaymentHistoryRequest request) {
+        log.info("Creating payment history mandateId={}, status={}", request.mandateId(), request.status());
         PaymentHistory history = PaymentHistory.builder()
                 .merchantId(request.merchantId())
                 .customerId(request.customerId())
@@ -120,7 +130,9 @@ public class IngestionController {
                 .transactionTime(request.transactionTime() == null ? LocalDateTime.now() : request.transactionTime())
                 .paymentDate(request.paymentDate())
                 .build();
-        return paymentHistoryRepository.save(history);
+        PaymentHistory saved = paymentHistoryRepository.save(history);
+        log.info("Payment history created mandateId={}, id={}", saved.getMandateId(), saved.getId());
+        return saved;
     }
 
     @GetMapping("/payment-history")

@@ -8,6 +8,7 @@ import com.recoverai.recoverai.exception.ResourceNotFoundException;
 import com.recoverai.recoverai.repository.FailedMandateRepository;
 import com.recoverai.recoverai.service.BatchProcessingService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping("/api/agent")
 public class AgentController {
 
@@ -25,6 +27,7 @@ public class AgentController {
     @PostMapping("/run/{mandateId}")
     public RecoveryResult run(
             @PathVariable String mandateId) {
+        log.info("Agent run requested for mandateId={}", mandateId);
 
         FailedMandate mandate =
                 failedMandateRepository
@@ -36,6 +39,7 @@ public class AgentController {
 
     @PostMapping("/run-all")
     public BatchRunResult runAll() {
+        log.info("Agent run-all requested");
         return batchProcessingService.runAllFailedMandates();
     }
 }

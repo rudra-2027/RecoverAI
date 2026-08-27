@@ -17,6 +17,7 @@ import com.recoverai.recoverai.repository.RecoveryDecisionRepository;
 import com.recoverai.recoverai.repository.RecoveryOutcomeRepository;
 import com.recoverai.recoverai.service.BatchFileService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,6 +32,7 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BatchFileServiceImpl implements BatchFileService {
     private final BatchRunRepository batchRunRepository;
     private final FailedMandateRepository failedMandateRepository;
@@ -42,11 +44,13 @@ public class BatchFileServiceImpl implements BatchFileService {
     @Override
     public BatchUploadResult upload(MultipartFile file, boolean process) {
         if (file == null || file.isEmpty()) {
+            log.warn("Rejected empty batch upload");
             throw new IllegalArgumentException("Upload file is required");
         }
 
         String fileName = Objects.requireNonNullElse(file.getOriginalFilename(), "uploaded-batch");
         String sourceType = sourceType(fileName);
+        log.info("Uploading batch file name={}, sourceType={}, process={}", fileName, sourceType, process);
         BatchRun batchRun = batchRunRepository.save(BatchRun.builder()
                 .startedAt(LocalDateTime.now())
                 .sourceFileName(fileName)
@@ -60,6 +64,7 @@ public class BatchFileServiceImpl implements BatchFileService {
 
         try {
             List<FailedMandate> mandates = parse(file, sourceType);
+            log.info("Parsed {} mandates from batchRunId={}, fileName={}", mandates.size(), batchRun.getId(), fileName);
             mandates.forEach(mandate -> {
                 mandate.setBatchRunId(batchRun.getId());
                 mandate.setCreatedAt(LocalDateTime.now());
@@ -79,6 +84,8 @@ public class BatchFileServiceImpl implements BatchFileService {
             batchRunRepository.save(batchRun);
 
             BatchRunResult processingResult = process ? runBatch(batchRun.getId()) : null;
+            log.info("Batch upload completed for batchRunId={}, process={}, totalMandates={}",
+                    batchRun.getId(), process, mandates.size());
             return new BatchUploadResult(
                     batchRun.getId(),
                     fileName,
@@ -87,12 +94,14 @@ public class BatchFileServiceImpl implements BatchFileService {
                     process,
                     processingResult);
         } catch (RuntimeException ex) {
+            log.error("Batch upload failed for batchRunId={}, fileName={}", batchRun.getId(), fileName, ex);
             batchRun.setStatus("FAILED");
             batchRun.setCompletedAt(LocalDateTime.now());
             batchRun.setErrorMessage(ex.getMessage());
             batchRunRepository.save(batchRun);
             throw ex;
         } catch (Exception ex) {
+            log.error("Batch import failed for batchRunId={}, fileName={}", batchRun.getId(), fileName, ex);
             batchRun.setStatus("FAILED");
             batchRun.setCompletedAt(LocalDateTime.now());
             batchRun.setErrorMessage(ex.getMessage());
@@ -103,6 +112,7 @@ public class BatchFileServiceImpl implements BatchFileService {
 
     @Override
     public BatchRunResult runBatch(Long batchRunId) {
+        log.info("Starting batch processing for batchRunId={}", batchRunId);
         BatchRun batchRun = batchRunRepository.findById(batchRunId)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch run not found: " + batchRunId));
         List<FailedMandate> mandates = failedMandateRepository.findByBatchRunId(batchRunId);
@@ -115,6 +125,8 @@ public class BatchFileServiceImpl implements BatchFileService {
 
         for (FailedMandate mandate : mandates) {
             RecoveryResult result = revenueRecoveryAgent.run(mandate);
+            log.debug("Batch run id={} processed mandateId={} with outcome={}",
+                    batchRunId, mandate.getMandateId(), result.outcome());
             if ("SUCCESS".equals(result.outcome())) {
                 successes++;
                 recoveredRevenue = recoveredRevenue.add(mandate.getAmount());
@@ -130,6 +142,8 @@ public class BatchFileServiceImpl implements BatchFileService {
         batchRun.setRecoveredRevenue(recoveredRevenue);
         batchRun.setStatus("COMPLETED");
         batchRunRepository.save(batchRun);
+        log.info("Completed batchRunId={} total={} successes={} failures={} recoveredRevenue={}",
+                batchRun.getId(), mandates.size(), successes, failures, recoveredRevenue);
 
         double recoveryRate = mandates.isEmpty() ? 0.0 : successes * 100.0 / mandates.size();
         return new BatchRunResult(batchRun.getId(), mandates.size(), successes, failures, recoveredRevenue, recoveryRate, batchRun.getStatus());
@@ -137,6 +151,7 @@ public class BatchFileServiceImpl implements BatchFileService {
 
     @Override
     public byte[] exportReport(Long batchRunId) {
+        log.info("Exporting batch report for batchRunId={}", batchRunId);
         batchRunRepository.findById(batchRunId)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch run not found: " + batchRunId));
         List<FailedMandate> mandates = failedMandateRepository.findByBatchRunId(batchRunId);

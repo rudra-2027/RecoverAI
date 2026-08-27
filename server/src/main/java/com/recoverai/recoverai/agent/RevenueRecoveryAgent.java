@@ -26,9 +26,11 @@ import com.recoverai.recoverai.service.PaymentVerificationService;
 import com.recoverai.recoverai.service.ScoringService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RevenueRecoveryAgent {
 
     private final FailureAnalysisService failureAnalysisService;
@@ -43,18 +45,23 @@ public class RevenueRecoveryAgent {
     private final RecoveryOutcomeRepository outcomeRepository;
 
     public RecoveryResult run(FailedMandate mandate) {
+        log.info("Starting revenue recovery for mandateId={}, merchantId={}", mandate.getMandateId(), mandate.getMerchantId());
         auditService.log(mandate.getMandateId(), "INGESTION", "Failure received");
 
         AnalysisResult analysis =
                 failureAnalysisService.analyze(mandate);
+        log.debug("Failure analysis completed for mandateId={}, classification={}", mandate.getMandateId(), analysis.classification());
         auditService.log(mandate.getMandateId(), "ANALYSIS", analysis.toString());
 
         analysis =
                 scoringService.score(mandate, analysis);
+        log.debug("Recovery scoring completed for mandateId={}, score={}", mandate.getMandateId(), analysis.recoverabilityScore());
         auditService.log(mandate.getMandateId(), "PROBABILITY", analysis.toString());
 
         DecisionResult decision =
                 decisionService.decide(mandate, analysis);
+        log.info("Recovery decision created for mandateId={}, action={}, reasonCode={}",
+                mandate.getMandateId(), decision.action(), decision.reasonCode());
 
         RecoveryDecision decisionEntity =
                 new RecoveryDecision();
@@ -84,6 +91,7 @@ public class RevenueRecoveryAgent {
         auditService.log(mandate.getMandateId(), "DECISION", decision.toString());
 
         if (decision.escalated()) {
+            log.warn("Recovery escalated for mandateId={}, reason={}", mandate.getMandateId(), decision.escalationReason());
             mandate.setEscalated(true);
             mandate.setEscalationReason(decision.escalationReason());
             mandate.setStopReason(decision.stopReason());
@@ -95,6 +103,7 @@ public class RevenueRecoveryAgent {
         }
 
         if (decision.stopReason() != null) {
+            log.info("Recovery stopped for mandateId={}, stopReason={}", mandate.getMandateId(), decision.stopReason());
             mandate.setStopReason(decision.stopReason());
             failedMandateRepository.save(mandate);
             auditService.log(mandate.getMandateId(), "STOPPED", decision.stopReason().name());
@@ -104,6 +113,7 @@ public class RevenueRecoveryAgent {
         }
 
         if (RecoveryAction.NOTIFY_CUSTOMER.name().equals(decision.action())) {
+            log.info("Customer notification required for mandateId={}", mandate.getMandateId());
             auditService.log(mandate.getMandateId(), "DECISION", decision.escalationReason());
             recordOutcome(mandate, decision, RecoveryOutcomeStatus.PENDING, null, "Customer notification required");
             auditService.log(mandate.getMandateId(), "OUTCOME", RecoveryOutcomeStatus.PENDING.name());
@@ -116,6 +126,7 @@ public class RevenueRecoveryAgent {
         auditService.log(mandate.getMandateId(), "PRE_RETRY_CHECK", "Checking whether customer already paid");
 
         if (paymentVerificationService.alreadyPaid(mandate)) {
+            log.info("Recovery cancelled because customer already paid for mandateId={}", mandate.getMandateId());
             mandate.setStopReason(StopReason.CUSTOMER_ALREADY_PAID);
             failedMandateRepository.save(mandate);
             decisionEntity.setStopReason(StopReason.CUSTOMER_ALREADY_PAID);
@@ -135,6 +146,8 @@ public class RevenueRecoveryAgent {
         recordOutcome(mandate, decision, outcomeStatus, paymentResult.transactionId(), paymentResult.message());
         auditService.log(mandate.getMandateId(), "OUTCOME", outcomeStatus.name());
         auditService.log(mandate.getMandateId(), "EXECUTION", "Payment execution completed: " + paymentResult.message());
+        log.info("Recovery completed for mandateId={}, outcome={}, transactionId={}",
+                mandate.getMandateId(), outcomeStatus, paymentResult.transactionId());
 
         return result(mandate, analysis, decision, outcomeStatus.name());
     }
@@ -154,6 +167,7 @@ public class RevenueRecoveryAgent {
         outcomeEntity.setSimulationReason(simulationReason);
         outcomeEntity.setOutcomeTimestamp(LocalDateTime.now());
         outcomeRepository.save(outcomeEntity);
+        log.debug("Recovery outcome recorded for mandateId={}, outcome={}", mandate.getMandateId(), outcomeStatus);
     }
 
     private RecoveryResult result(

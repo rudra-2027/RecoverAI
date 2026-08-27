@@ -18,12 +18,14 @@ import com.recoverai.recoverai.service.GeminiService;
 import com.recoverai.recoverai.service.MetricsService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class GeminiServiceImpl implements GeminiService {
     private static final String GEMINI_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
     private final RecoverAiProperties properties;
     private final RecoveryDecisionRepository decisionRepository;
@@ -34,6 +36,7 @@ public class GeminiServiceImpl implements GeminiService {
 
     @Override
     public String explainDecision(String mandateId) {
+        log.info("Generating AI explanation for mandateId={}", mandateId);
         RecoveryDecision decision = decisionRepository.findTopByMandateIdOrderByCreatedAtDesc(mandateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Decision not found for mandate: " + mandateId));
         String fallback = "Mandate %s was classified as %s with a recovery probability of %d%%. Recommended action is %s%s."
@@ -65,6 +68,7 @@ public class GeminiServiceImpl implements GeminiService {
 
     @Override
     public String summarizeBatches() {
+        log.info("Generating AI batch summary");
         String fallback = batchRunRepository.findAll().stream()
                 .reduce((first, second) -> second)
                 .map(batch -> "Latest batch processed %d mandates, recovered %s, and completed at %s."
@@ -76,6 +80,7 @@ public class GeminiServiceImpl implements GeminiService {
     @Override
     public String answerMerchantQuestion(String question) {
         List<AuditLog> logs = auditLogRepository.findAll();
+        log.info("Generating AI merchant answer using {} audit events", logs.size());
         String fallback = "Based on %d audit events, the current answer to '%s' is best found by checking the latest decisions and audit trail for the mandate in question."
                 .formatted(logs.size(), question);
         return askGemini("Answer this merchant question using the RecoverAI audit/decision context: " + fallback, fallback);
@@ -83,6 +88,7 @@ public class GeminiServiceImpl implements GeminiService {
 
     @Override
     public String generateInsights() {
+        log.info("Generating AI dashboard insights");
         MetricsResponse metrics = metricsService.calculate();
         String fallback = "Recovered revenue is %s against %s at risk. Average recovery probability is %.2f%% and retry success rate is %.2f%%."
                 .formatted(
@@ -96,6 +102,7 @@ public class GeminiServiceImpl implements GeminiService {
     @SuppressWarnings("unchecked")
     private String askGemini(String prompt, String fallback) {
         if (properties.geminiApiKey() == null || properties.geminiApiKey().isBlank()) {
+            log.debug("Gemini API key is not configured; returning fallback response");
             return fallback;
         }
         try {
@@ -109,18 +116,22 @@ public class GeminiServiceImpl implements GeminiService {
                     .retrieve()
                     .body(Map.class);
             if (response == null) {
+                log.warn("Gemini returned an empty response; using fallback");
                 return fallback;
             }
             List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
             if (candidates == null || candidates.isEmpty()) {
+                log.warn("Gemini returned no candidates; using fallback");
                 return fallback;
             }
             Map<String, Object> content = (Map<String, Object>) candidates.getFirst().get("content");
             List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
             Object text = parts.getFirst().get("text");
+            log.debug("Gemini response generated successfully");
             return text == null ? fallback : text.toString();
         } catch (RuntimeException ex) {
-            return fallback;
+            log.warn("Gemini request failed; using fallback response", ex);
+            return "Gemini Error";
         }
     }
 }
