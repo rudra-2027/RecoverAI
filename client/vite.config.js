@@ -6,13 +6,14 @@ import { defineConfig, loadEnv } from 'vite'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const apiBaseUrl = env.VITE_API_BASE_URL?.trim() || 'http://localhost:8080'
+  const proxyTarget = apiBaseUrl.replace(/\/api\/?$/, '')
 
   return {
     plugins: [react(), tailwindcss()],
     server: {
       proxy: {
         '/api': {
-          target: apiBaseUrl,
+          target: proxyTarget,
           changeOrigin: true,
         },
       },
