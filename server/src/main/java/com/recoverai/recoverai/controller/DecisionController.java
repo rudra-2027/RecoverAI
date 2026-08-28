@@ -5,10 +5,13 @@ import com.recoverai.recoverai.dto.DecisionOverrideRequest;
 import com.recoverai.recoverai.dto.ProcessBatchDecisionsRequest;
 import com.recoverai.recoverai.dto.RecoveryResult;
 import com.recoverai.recoverai.entity.FailedMandate;
+import com.recoverai.recoverai.entity.PaymentStatus;
 import com.recoverai.recoverai.entity.RecoveryDecision;
+import com.recoverai.recoverai.entity.RecoveryOutcomeStatus;
 import com.recoverai.recoverai.exception.ResourceNotFoundException;
 import com.recoverai.recoverai.repository.FailedMandateRepository;
 import com.recoverai.recoverai.repository.RecoveryDecisionRepository;
+import com.recoverai.recoverai.repository.RecoveryOutcomeRepository;
 import com.recoverai.recoverai.service.AuditService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +25,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -30,13 +38,28 @@ import java.util.List;
 @RequestMapping("/api/decisions")
 public class DecisionController {
     private final RecoveryDecisionRepository decisionRepository;
+    private final RecoveryOutcomeRepository outcomeRepository;
     private final FailedMandateRepository failedMandateRepository;
     private final RevenueRecoveryAgent revenueRecoveryAgent;
     private final AuditService auditService;
 
     @GetMapping
     public List<RecoveryDecision> all() {
-        return decisionRepository.findAll();
+        Set<String> recoveredMandateIds = outcomeRepository.findByOutcome(RecoveryOutcomeStatus.SUCCESS).stream()
+                .map(outcome -> outcome.getMandateId())
+                .collect(Collectors.toSet());
+
+        Map<String, RecoveryDecision> latestOpenDecisionByMandate = decisionRepository.findAll().stream()
+                .filter(decision -> decision.getMandateId() != null)
+                .filter(decision -> !recoveredMandateIds.contains(decision.getMandateId()))
+                .collect(Collectors.toMap(
+                        RecoveryDecision::getMandateId,
+                        Function.identity(),
+                        (first, second) -> isAfter(second, first) ? second : first));
+
+        return latestOpenDecisionByMandate.values().stream()
+                .sorted(Comparator.comparing(RecoveryDecision::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
     }
 
     @GetMapping("/{mandateId}")
@@ -93,7 +116,20 @@ public class DecisionController {
         return request.mandateIds().stream()
                 .map(mandateId -> failedMandateRepository.findByMandateId(mandateId)
                         .orElseThrow(() -> new ResourceNotFoundException("Mandate not found: " + mandateId)))
+                .filter(mandate -> mandate.getStatus() == PaymentStatus.FAILED)
+                .filter(mandate -> outcomeRepository.findByMandateIdOrderByOutcomeTimestampDesc(mandate.getMandateId()).stream()
+                        .noneMatch(outcome -> outcome.getOutcome() == RecoveryOutcomeStatus.SUCCESS))
                 .map(revenueRecoveryAgent::run)
                 .toList();
+    }
+
+    private boolean isAfter(RecoveryDecision candidate, RecoveryDecision current) {
+        if (candidate.getCreatedAt() == null) {
+            return false;
+        }
+        if (current.getCreatedAt() == null) {
+            return true;
+        }
+        return candidate.getCreatedAt().isAfter(current.getCreatedAt());
     }
 }

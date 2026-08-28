@@ -1,7 +1,9 @@
 package com.recoverai.recoverai.service.impl;
 
 import com.recoverai.recoverai.dto.MetricsResponse;
+import com.recoverai.recoverai.dto.MetricsTrendPoint;
 import com.recoverai.recoverai.entity.FailedMandate;
+import com.recoverai.recoverai.entity.PaymentStatus;
 import com.recoverai.recoverai.entity.RecoveryDecision;
 import com.recoverai.recoverai.entity.RecoveryOutcome;
 import com.recoverai.recoverai.entity.RecoveryOutcomeStatus;
@@ -14,7 +16,14 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +34,7 @@ public class MetricsServiceImpl implements MetricsService {
 
     @Override
     public MetricsResponse calculate() {
-        List<FailedMandate> failedMandates = failedMandateRepository.findAll();
+        List<FailedMandate> failedMandates = failedMandateRepository.findByStatus(PaymentStatus.FAILED);
         List<RecoveryDecision> decisions = decisionRepository.findAll();
         List<RecoveryOutcome> outcomes = outcomeRepository.findAll();
 
@@ -78,5 +87,68 @@ public class MetricsServiceImpl implements MetricsService {
                 highValueCustomers,
                 failedMandates.size(),
                 recoveredCount);
+    }
+
+    @Override
+    public List<MetricsTrendPoint> trends() {
+        List<FailedMandate> failedMandates = failedMandateRepository.findAll();
+        List<RecoveryOutcome> outcomes = outcomeRepository.findAll();
+
+        YearMonth latestFailureMonth = failedMandates.stream()
+                .filter(mandate -> mandate.getFailureTimestamp() != null)
+                .map(mandate -> YearMonth.from(mandate.getFailureTimestamp()))
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+        YearMonth latestOutcomeMonth = outcomes.stream()
+                .filter(outcome -> outcome.getOutcomeTimestamp() != null)
+                .map(outcome -> YearMonth.from(outcome.getOutcomeTimestamp()))
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+        YearMonth latestMonth = Stream.of(latestFailureMonth, latestOutcomeMonth, YearMonth.now())
+                .filter(month -> month != null)
+                .max(Comparator.naturalOrder())
+                .orElse(YearMonth.now());
+        YearMonth startMonth = latestMonth.minusMonths(5);
+
+        Map<YearMonth, BigDecimal> failedByMonth = failedMandates.stream()
+                .filter(mandate -> mandate.getFailureTimestamp() != null)
+                .filter(mandate -> !YearMonth.from(mandate.getFailureTimestamp()).isBefore(startMonth))
+                .collect(Collectors.groupingBy(
+                        mandate -> YearMonth.from(mandate.getFailureTimestamp()),
+                        TreeMap::new,
+                        Collectors.mapping(FailedMandate::getAmount, Collectors.reducing(BigDecimal.ZERO, this::safeAmount, BigDecimal::add))));
+
+        Map<YearMonth, BigDecimal> recoveredByMonth = outcomes.stream()
+                .filter(outcome -> outcome.getOutcomeTimestamp() != null)
+                .filter(outcome -> outcome.getOutcome() == RecoveryOutcomeStatus.SUCCESS)
+                .filter(outcome -> !YearMonth.from(outcome.getOutcomeTimestamp()).isBefore(startMonth))
+                .collect(Collectors.groupingBy(
+                        outcome -> YearMonth.from(outcome.getOutcomeTimestamp()),
+                        TreeMap::new,
+                        Collectors.mapping(RecoveryOutcome::getRecoveredAmount, Collectors.reducing(BigDecimal.ZERO, this::safeAmount, BigDecimal::add))));
+
+        Map<YearMonth, BigDecimal> aiRecoveredByMonth = outcomes.stream()
+                .filter(outcome -> outcome.getOutcomeTimestamp() != null)
+                .filter(outcome -> outcome.getOutcome() == RecoveryOutcomeStatus.SUCCESS)
+                .filter(outcome -> outcome.getActionTaken() != null)
+                .filter(outcome -> !YearMonth.from(outcome.getOutcomeTimestamp()).isBefore(startMonth))
+                .collect(Collectors.groupingBy(
+                        outcome -> YearMonth.from(outcome.getOutcomeTimestamp()),
+                        TreeMap::new,
+                        Collectors.mapping(RecoveryOutcome::getRecoveredAmount, Collectors.reducing(BigDecimal.ZERO, this::safeAmount, BigDecimal::add))));
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM yy");
+        return Stream.iterate(startMonth, month -> month.plusMonths(1))
+                .limit(6)
+                .map(month -> new MetricsTrendPoint(
+                        month.format(formatter),
+                        failedByMonth.getOrDefault(month, BigDecimal.ZERO),
+                        recoveredByMonth.getOrDefault(month, BigDecimal.ZERO),
+                        aiRecoveredByMonth.getOrDefault(month, BigDecimal.ZERO)))
+                .toList();
+    }
+
+    private BigDecimal safeAmount(BigDecimal amount) {
+        return amount == null ? BigDecimal.ZERO : amount;
     }
 }

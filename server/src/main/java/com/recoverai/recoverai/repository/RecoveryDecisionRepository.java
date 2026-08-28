@@ -12,5 +12,7 @@ import java.util.Optional;
 public interface RecoveryDecisionRepository extends JpaRepository<RecoveryDecision, Long > {
     Optional<RecoveryDecision> findTopByMandateIdOrderByCreatedAtDesc(String mandateId);
 
+    Optional<RecoveryDecision> findTopByEscalatedTrueOrderByCreatedAtDesc();
+
     List<RecoveryDecision> findByMandateIdOrderByCreatedAtDesc(String mandateId);
 }

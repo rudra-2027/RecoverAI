@@ -12,5 +12,7 @@ import java.util.List;
 public interface  RecoveryOutcomeRepository extends JpaRepository<RecoveryOutcome, Long> {
     List<RecoveryOutcome> findByMandateIdOrderByOutcomeTimestampDesc(String mandateId);
 
+    List<RecoveryOutcome> findByOutcome(RecoveryOutcomeStatus outcome);
+
     long countByOutcome(RecoveryOutcomeStatus outcome);
 }

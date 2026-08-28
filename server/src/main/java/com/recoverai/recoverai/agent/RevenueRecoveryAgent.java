@@ -9,6 +9,7 @@ import com.recoverai.recoverai.dto.AnalysisResult;
 import com.recoverai.recoverai.dto.DecisionResult;
 import com.recoverai.recoverai.dto.RecoveryResult;
 import com.recoverai.recoverai.entity.FailedMandate;
+import com.recoverai.recoverai.entity.PaymentStatus;
 import com.recoverai.recoverai.entity.RecoveryAction;
 import com.recoverai.recoverai.entity.RecoveryDecision;
 import com.recoverai.recoverai.entity.RecoveryOutcome;
@@ -127,6 +128,8 @@ public class RevenueRecoveryAgent {
 
         if (paymentVerificationService.alreadyPaid(mandate)) {
             log.info("Recovery cancelled because customer already paid for mandateId={}", mandate.getMandateId());
+            mandate.setStatus(PaymentStatus.SUCCESS);
+            mandate.setNextRetryAt(null);
             mandate.setStopReason(StopReason.CUSTOMER_ALREADY_PAID);
             failedMandateRepository.save(mandate);
             decisionEntity.setStopReason(StopReason.CUSTOMER_ALREADY_PAID);
@@ -143,6 +146,11 @@ public class RevenueRecoveryAgent {
         RecoveryOutcomeStatus outcomeStatus = paymentResult.success()
                 ? RecoveryOutcomeStatus.SUCCESS
                 : RecoveryOutcomeStatus.FAILED;
+        if (outcomeStatus == RecoveryOutcomeStatus.SUCCESS) {
+            mandate.setStatus(PaymentStatus.RETRY_SUCCESS);
+            mandate.setNextRetryAt(null);
+            failedMandateRepository.save(mandate);
+        }
         recordOutcome(mandate, decision, outcomeStatus, paymentResult.transactionId(), paymentResult.message());
         auditService.log(mandate.getMandateId(), "OUTCOME", outcomeStatus.name());
         auditService.log(mandate.getMandateId(), "EXECUTION", "Payment execution completed: " + paymentResult.message());

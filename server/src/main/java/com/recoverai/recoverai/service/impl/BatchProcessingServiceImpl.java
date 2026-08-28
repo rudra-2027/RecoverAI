@@ -5,6 +5,7 @@ import com.recoverai.recoverai.dto.BatchRunResult;
 import com.recoverai.recoverai.dto.RecoveryResult;
 import com.recoverai.recoverai.entity.BatchRun;
 import com.recoverai.recoverai.entity.FailedMandate;
+import com.recoverai.recoverai.entity.PaymentStatus;
 import com.recoverai.recoverai.repository.BatchRunRepository;
 import com.recoverai.recoverai.repository.FailedMandateRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ public class BatchProcessingServiceImpl implements com.recoverai.recoverai.servi
                 .build();
         batchRunRepository.save(batchRun);
 
-        List<FailedMandate> mandates = failedMandateRepository.findAll();
+        List<FailedMandate> mandates = failedMandateRepository.findByStatus(PaymentStatus.FAILED);
         log.info("Batch run id={} loaded {} mandates", batchRun.getId(), mandates.size());
         int successes = 0;
         int failures = 0;

@@ -84,7 +84,7 @@ public class IngestionController {
 
     @GetMapping("/failed-mandates")
     public List<FailedMandate> failedMandates() {
-        return failedMandateRepository.findAll();
+        return failedMandateRepository.findByStatus(PaymentStatus.FAILED);
     }
 
     @GetMapping("/failed-mandates/export")
@@ -92,7 +92,7 @@ public class IngestionController {
         log.info("Failed mandates export requested");
         StringBuilder csv = new StringBuilder();
         csv.append("id,merchantId,customerId,mandateId,amount,failureReason,failureCode,retryCount,maxRetries,status,mandateStatus,nextRetryAt,stopReason,escalated,createdAt\n");
-        for (FailedMandate mandate : failedMandateRepository.findAll()) {
+        for (FailedMandate mandate : failedMandateRepository.findByStatus(PaymentStatus.FAILED)) {
             csv.append(mandate.getId()).append(',')
                     .append(escape(mandate.getMerchantId())).append(',')
                     .append(escape(mandate.getCustomerId())).append(',')
@@ -131,6 +131,14 @@ public class IngestionController {
                 .paymentDate(request.paymentDate())
                 .build();
         PaymentHistory saved = paymentHistoryRepository.save(history);
+        if (saved.getStatus() == PaymentStatus.SUCCESS) {
+            failedMandateRepository.findByMandateId(saved.getMandateId()).ifPresent(mandate -> {
+                mandate.setStatus(PaymentStatus.SUCCESS);
+                mandate.setNextRetryAt(null);
+                failedMandateRepository.save(mandate);
+                log.info("Failed mandate marked successful mandateId={}", saved.getMandateId());
+            });
+        }
         log.info("Payment history created mandateId={}, id={}", saved.getMandateId(), saved.getId());
         return saved;
     }

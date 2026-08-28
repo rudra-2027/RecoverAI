@@ -115,7 +115,7 @@ public class BatchFileServiceImpl implements BatchFileService {
         log.info("Starting batch processing for batchRunId={}", batchRunId);
         BatchRun batchRun = batchRunRepository.findById(batchRunId)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch run not found: " + batchRunId));
-        List<FailedMandate> mandates = failedMandateRepository.findByBatchRunId(batchRunId);
+        List<FailedMandate> mandates = failedMandateRepository.findByBatchRunIdAndStatus(batchRunId, PaymentStatus.FAILED);
         int successes = 0;
         int failures = 0;
         BigDecimal recoveredRevenue = BigDecimal.ZERO;

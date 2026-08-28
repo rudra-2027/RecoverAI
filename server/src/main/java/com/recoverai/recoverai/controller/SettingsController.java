@@ -6,6 +6,7 @@ import com.recoverai.recoverai.dto.RecoverySettingsRequest;
 import com.recoverai.recoverai.dto.RecoverySettingsResponse;
 import com.recoverai.recoverai.dto.SystemStatusResponse;
 import com.recoverai.recoverai.entity.Merchant;
+import com.recoverai.recoverai.entity.PaymentStatus;
 import com.recoverai.recoverai.exception.ResourceNotFoundException;
 import com.recoverai.recoverai.repository.BatchRunRepository;
 import com.recoverai.recoverai.repository.FailedMandateRepository;
@@ -77,7 +78,7 @@ public class SettingsController {
                 "UP",
                 LocalDateTime.now(),
                 merchantRepository.count(),
-                failedMandateRepository.count(),
+                failedMandateRepository.countByStatus(PaymentStatus.FAILED),
                 decisionRepository.count(),
                 outcomeRepository.count(),
                 batchRunRepository.count(),
