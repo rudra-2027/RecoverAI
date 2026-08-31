@@ -171,65 +171,69 @@ export default function AIInsights() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter flex-1 min-h-0">
         
         {/* Left: AI Executive Summaries */}
-        <div className="lg:col-span-5 flex flex-col gap-stack-md overflow-y-auto chat-scroll pr-2 pb-stack-lg min-h-0">
-          <h3 className="font-title-lg text-title-lg text-on-surface sticky top-0 bg-background/90 backdrop-blur py-2 z-10">
+        <div className="lg:col-span-5 flex flex-col min-h-0 overflow-hidden">
+          <h3 className="font-title-lg text-title-lg text-on-surface py-2 shrink-0">
             Executive Summaries
           </h3>
 
-          {isLoadingSummaries ? (
-            <>
-              <SummaryCardSkeleton />
-              <SummaryCardSkeleton />
-            </>
-          ) : summaries.length === 0 ? (
-            <div className="bg-surface rounded-xl p-6 border border-outline-variant/30 text-center text-on-surface-variant">
-              All executive summaries have been processed or dismissed.
-            </div>
-          ) : (
-            summaries.map(item => (
-              <div 
-                key={item.id} 
-                className="bg-surface rounded-xl p-stack-md border border-outline-variant/40 shadow-level1 relative overflow-hidden group transition-all"
-              >
-                <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full -z-10 transition-colors ${item.bg}`}></div>
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center shrink-0">
-                    <span className={`material-symbols-outlined text-sm ${item.color}`}>
-                      {item.icon}
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-title-md text-title-md text-on-surface">{item.title}</h4>
-                    <span className="font-label-md text-label-md text-secondary">{item.time}</span>
-                  </div>
-                </div>
-                <div className="mb-2">
-                  <AiAnswerContent text={item.description} compact />
-                </div>
-                <div className="mt-3 p-3 bg-surface-container/40 rounded-lg border border-outline-variant/20">
-                  <span className="font-label-md text-label-md text-primary font-bold uppercase tracking-wider block mb-1">Recommendation</span>
-                  <p className="text-body-sm text-on-surface-variant">{item.recommendation}</p>
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <button 
-                    onClick={() => {
-                      handleSend(`Apply optimization for: ${item.title}`);
-                      handleDismissSummary(item.id);
-                    }}
-                    className="font-label-md text-label-md text-primary hover:bg-primary-container/20 px-3 py-1.5 rounded transition-colors border border-primary/20 bg-white shadow-sm font-semibold"
-                  >
-                    Apply Strategy
-                  </button>
-                  <button 
-                    onClick={() => handleDismissSummary(item.id)}
-                    className="font-label-md text-label-md text-secondary hover:bg-surface-container px-3 py-1.5 rounded transition-colors border border-outline-variant/30 bg-white"
-                  >
-                    Dismiss
-                  </button>
-                </div>
+          <div className="flex-1 min-h-0 overflow-y-auto chat-scroll pr-2 pb-stack-lg flex flex-col gap-stack-md">
+            {isLoadingSummaries ? (
+              <>
+                <SummaryCardSkeleton />
+                <SummaryCardSkeleton />
+              </>
+            ) : summaries.length === 0 ? (
+              <div className="bg-surface rounded-xl p-6 border border-outline-variant/30 text-center text-on-surface-variant">
+                All executive summaries have been processed or dismissed.
               </div>
-            ))
-          )}
+            ) : (
+              summaries.map(item => (
+                <div
+                  key={item.id}
+                  className="bg-surface rounded-xl p-stack-md border border-outline-variant/40 shadow-level1 relative overflow-hidden group transition-all h-80 shrink-0 flex flex-col"
+                >
+                  <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full -z-10 transition-colors ${item.bg}`}></div>
+                  <div className="flex items-start gap-3 mb-3 shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center shrink-0">
+                      <span className={`material-symbols-outlined text-sm ${item.color}`}>
+                        {item.icon}
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="font-title-md text-title-md text-on-surface">{item.title}</h4>
+                      <span className="font-label-md text-label-md text-secondary">{item.time}</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto chat-scroll pr-1">
+                    <div className="mb-2">
+                      <AiAnswerContent text={item.description} compact />
+                    </div>
+                    <div className="mt-3 p-3 bg-surface-container/40 rounded-lg border border-outline-variant/20">
+                      <span className="font-label-md text-label-md text-primary font-bold uppercase tracking-wider block mb-1">Recommendation</span>
+                      <p className="text-body-sm text-on-surface-variant">{item.recommendation}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-2 shrink-0">
+                    <button
+                      onClick={() => {
+                        handleSend(`Apply optimization for: ${item.title}`);
+                        handleDismissSummary(item.id);
+                      }}
+                      className="font-label-md text-label-md text-primary hover:bg-primary-container/20 px-3 py-1.5 rounded transition-colors border border-primary/20 bg-white shadow-sm font-semibold"
+                    >
+                      Apply Strategy
+                    </button>
+                    <button
+                      onClick={() => handleDismissSummary(item.id)}
+                      className="font-label-md text-label-md text-secondary hover:bg-surface-container px-3 py-1.5 rounded transition-colors border border-outline-variant/30 bg-white"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         {/* Right: AI Chat Interface / Copilot */}
