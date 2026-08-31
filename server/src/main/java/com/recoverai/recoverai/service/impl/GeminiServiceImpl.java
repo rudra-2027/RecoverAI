@@ -47,6 +47,13 @@ public class GeminiServiceImpl implements GeminiService {
             Mention audit event counts only when the provided backend data includes that count.
             If the exact reason cannot be determined from the backend data, say that clearly and name the specific decision or audit records to check.
             Do not use sections named "Why this answer is optimal", "Data-Driven Confidence", "Transparency & Accountability", or "In summary".
+            Use this readable response format:
+            Answer:
+            - Direct answer in one or two bullets.
+            Evidence:
+            - Only backend facts relevant to the question.
+            Next action:
+            - One operational step, if useful.
             """;
     private static final List<String> META_RESPONSE_MARKERS = List.of(
             "this is an excellent example",
@@ -71,7 +78,12 @@ public class GeminiServiceImpl implements GeminiService {
         log.info("Generating AI explanation for mandateId={}", mandateId);
         RecoveryDecision decision = decisionRepository.findTopByMandateIdOrderByCreatedAtDesc(mandateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Decision not found for mandate: " + mandateId));
-        String fallback = "Mandate %s was classified as %s with a recovery probability of %d%%. Recommended action is %s%s."
+        String fallback = """
+                Answer:
+                - Mandate %s was classified as %s with a recovery probability of %d%%.
+                Next action:
+                - Recommended action is %s%s.
+                """
                 .formatted(
                         decision.getMandateId(),
                         decision.getClassification(),
@@ -106,7 +118,17 @@ public class GeminiServiceImpl implements GeminiService {
                 .map(batch -> "Latest batch processed %d mandates, recovered %s, and completed at %s."
                         .formatted(batch.getTotalMandates(), batch.getRecoveredRevenue(), batch.getCompletedAt()))
                 .orElse("No batch runs have been recorded yet.");
-        return askGemini("Write a concise executive summary for RecoverAI batch runs. " + fallback, fallback);
+        return askGemini("""
+                Write a concise executive summary for RecoverAI batch runs.
+                Use this format:
+                Answer:
+                - Main summary.
+                Evidence:
+                - Relevant metric.
+                Next action:
+                - One operational recommendation.
+                Backend data: %s
+                """.formatted(fallback), fallback);
     }
 
     @Override
@@ -123,7 +145,7 @@ public class GeminiServiceImpl implements GeminiService {
         String context = buildMerchantQuestionContext(question, mandate, relevantLogs);
         String fallback = buildOperationalFallback(question, mandate, relevantLogs);
         String prompt = OPERATIONAL_SYSTEM_PROMPT + "\nBackend data:\n" + context + "\nUser question: " + question
-                + "\nFinal answer:";
+                + "\nFinal answer using the required readable format:";
         return askGemini(prompt, fallback);
     }
 
@@ -131,13 +153,33 @@ public class GeminiServiceImpl implements GeminiService {
     public String generateInsights() {
         log.info("Generating AI dashboard insights");
         MetricsResponse metrics = metricsService.calculate();
-        String fallback = "Recovered revenue is %s against %s at risk. Average recovery probability is %.2f%% and retry success rate is %.2f%%."
+        String fallback = """
+                Answer:
+                - Recovered revenue is %s against %s at risk.
+                Evidence:
+                - Average recovery probability is %.2f%%.
+                - Retry success rate is %.2f%%.
+                Next action:
+                - Review these metrics before applying recovery changes.
+                """
                 .formatted(
                         metrics.recoveredRevenue(),
                         metrics.revenueAtRisk(),
                         metrics.averageRecoveryProbability(),
                         metrics.retrySuccessRate());
-        return askGemini("Generate three concise dashboard insights for these RecoverAI metrics: " + fallback, fallback);
+        return askGemini("""
+                Generate three concise dashboard insights for these RecoverAI metrics.
+                Use this format:
+                Answer:
+                - Insight 1.
+                - Insight 2.
+                - Insight 3.
+                Evidence:
+                - Relevant metric facts only.
+                Next action:
+                - One operational recommendation.
+                Backend data: %s
+                """.formatted(fallback), fallback);
     }
 
     @SuppressWarnings("unchecked")
@@ -331,7 +373,12 @@ public class GeminiServiceImpl implements GeminiService {
             Optional<FailedMandate> mandate,
             List<AuditLog> relevantLogs) {
         if (mandate.isEmpty()) {
-            return "I could not identify a specific mandate from the question. Check the relevant mandate record, latest recovery decision, and audit trail before determining the exact answer.";
+            return """
+                    Answer:
+                    - I could not identify a specific mandate from the question.
+                    Next action:
+                    - Check the relevant mandate record, latest recovery decision, and audit trail before determining the exact answer.
+                    """;
         }
 
         FailedMandate selected = mandate.get();
@@ -343,7 +390,16 @@ public class GeminiServiceImpl implements GeminiService {
             String escalationReason = firstPresent(decision.getEscalationReason(), selected.getEscalationReason());
             if (Boolean.TRUE.equals(decision.getEscalated()) || Boolean.TRUE.equals(selected.getEscalated())) {
                 if (hasText(escalationReason)) {
-                    return "Mandate %s was escalated because %s. The latest decision is %s, with reason code %s. The audit trail contains %d related events."
+                    return """
+                            Answer:
+                            - Mandate %s was escalated because %s.
+                            Evidence:
+                            - Latest decision: %s.
+                            - Reason code: %s.
+                            - Audit trail: %d related events.
+                            Next action:
+                            - Review the latest audit events before taking manual recovery action.
+                            """
                             .formatted(
                                     selected.getMandateId(),
                                     escalationReason,
@@ -351,11 +407,26 @@ public class GeminiServiceImpl implements GeminiService {
                                     decision.getDecisionReasonCode(),
                                     relevantLogs.size());
                 }
-                return "Mandate %s was escalated, but the exact escalation reason is not present in the available data. Check recovery decision id %d and the latest audit events for mandate %s; the audit trail contains %d related events."
-                        .formatted(selected.getMandateId(), decision.getId(), selected.getMandateId(), relevantLogs.size());
+                return """
+                        Answer:
+                        - Mandate %s was escalated, but the exact escalation reason is not present in the available data.
+                        Evidence:
+                        - Recovery decision id: %d.
+                        - Audit trail: %d related events.
+                        Next action:
+                        - Check the latest audit events for mandate %s.
+                        """
+                        .formatted(selected.getMandateId(), decision.getId(), relevantLogs.size(), selected.getMandateId());
             }
 
-            return "Mandate %s has latest decision %s with reason code %s and recoverability score %s. It is not marked as escalated in the available decision data."
+            return """
+                    Answer:
+                    - Mandate %s is not marked as escalated in the available decision data.
+                    Evidence:
+                    - Latest decision: %s.
+                    - Reason code: %s.
+                    - Recoverability score: %s.
+                    """
                     .formatted(
                             selected.getMandateId(),
                             decision.getAction(),
@@ -363,7 +434,12 @@ public class GeminiServiceImpl implements GeminiService {
                             decision.getRecoverabilityScore());
         }
 
-        return "Mandate %s was found, but no recovery decision is available. Check the mandate record and audit events for mandate %s to determine the next operational step."
+        return """
+                Answer:
+                - Mandate %s was found, but no recovery decision is available.
+                Next action:
+                - Check the mandate record and audit events for mandate %s to determine the next operational step.
+                """
                 .formatted(selected.getMandateId(), selected.getMandateId());
     }
 

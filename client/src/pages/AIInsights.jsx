@@ -21,6 +21,10 @@ const BLOCKED_SECTION_HEADINGS = [
 
 const OPERATIONAL_FALLBACK = 'The backend response included non-operational commentary. Review the relevant mandate, latest recovery decision, and audit trail to determine the exact reason.';
 
+function stripMarkdownEmphasis(value) {
+  return value.replace(/^\*\*(.*)\*\*$/, '$1').trim();
+}
+
 function sanitizeAiAnswer(answer) {
   if (typeof answer !== 'string' || !answer.trim()) {
     return 'No backend answer returned.';
@@ -35,11 +39,54 @@ function sanitizeAiAnswer(answer) {
   return trimmed
     .split(/\r?\n/)
     .filter(line => {
-      const cleanLine = line.replace(/^#+\s*/, '').replace(/^\*\*(.*)\*\*$/, '$1').trim();
+      const cleanLine = stripMarkdownEmphasis(line.replace(/^#+\s*/, ''));
       return !BLOCKED_SECTION_HEADINGS.some(heading => cleanLine.toLowerCase() === heading.toLowerCase());
     })
     .join('\n')
     .trim() || OPERATIONAL_FALLBACK;
+}
+
+function AiAnswerContent({ text, compact = false }) {
+  const lines = String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+
+  if (lines.length <= 1) {
+    return <p className={`font-body-md text-body-md leading-relaxed ${compact ? 'text-on-surface-variant' : ''}`}>{text}</p>;
+  }
+
+  return (
+    <div className={`font-body-md text-body-md leading-relaxed space-y-2 ${compact ? 'text-on-surface-variant' : ''}`}>
+      {lines.map((line, index) => {
+        const heading = stripMarkdownEmphasis(line.replace(/^#+\s*/, ''));
+        const bulletMatch = line.match(/^([-*]|\d+[.)])\s+(.+)/);
+        const isHeading = !bulletMatch && (
+          line.startsWith('#')
+          || /^\*\*.+\*\*$/.test(line)
+          || /^[A-Z][A-Za-z0-9 &/-]{2,}:$/.test(line)
+        );
+
+        if (isHeading) {
+          return (
+            <h5 key={`${index}-${line}`} className="font-title-md text-title-md text-on-surface pt-1">
+              {heading.replace(/:$/, '')}
+            </h5>
+          );
+        }
+
+        if (bulletMatch) {
+          return (
+            <div key={`${index}-${line}`} className="flex gap-2">
+              <span className="font-label-md text-label-md text-primary shrink-0 min-w-5 pt-0.5">
+                {bulletMatch[1]}
+              </span>
+              <p className="min-w-0">{stripMarkdownEmphasis(bulletMatch[2])}</p>
+            </div>
+          );
+        }
+
+        return <p key={`${index}-${line}`}>{stripMarkdownEmphasis(line)}</p>;
+      })}
+    </div>
+  );
 }
 
 export default function AIInsights() {
@@ -156,9 +203,9 @@ export default function AIInsights() {
                     <span className="font-label-md text-label-md text-secondary">{item.time}</span>
                   </div>
                 </div>
-                <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed mb-2">
-                  {item.description}
-                </p>
+                <div className="mb-2">
+                  <AiAnswerContent text={item.description} compact />
+                </div>
                 <div className="mt-3 p-3 bg-surface-container/40 rounded-lg border border-outline-variant/20">
                   <span className="font-label-md text-label-md text-primary font-bold uppercase tracking-wider block mb-1">Recommendation</span>
                   <p className="text-body-sm text-on-surface-variant">{item.recommendation}</p>
@@ -234,7 +281,11 @@ export default function AIInsights() {
                     ? 'bg-surface-container border border-outline-variant/30 rounded-tl-sm text-on-surface' 
                     : 'bg-primary text-on-primary rounded-tr-sm'
                 }`}>
-                  <p className="font-body-md text-body-md leading-relaxed">{msg.text}</p>
+                  {msg.sender === 'ai' ? (
+                    <AiAnswerContent text={msg.text} />
+                  ) : (
+                    <p className="font-body-md text-body-md leading-relaxed">{msg.text}</p>
+                  )}
                   
                   {msg.list && (
                     <div className="bg-surface rounded-lg p-3 border border-outline-variant/20 mt-2">
