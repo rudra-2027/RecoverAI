@@ -35,7 +35,8 @@ import lombok.extern.slf4j.Slf4j;
 public class GeminiServiceImpl implements GeminiService {
     private static final String GEMINI_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
-    private static final Pattern MANDATE_ID_PATTERN = Pattern.compile("\\b[A-Za-z]{2,}-\\d{2,}\\b");
+    private static final Pattern MANDATE_ID_PATTERN =
+            Pattern.compile("\\b[A-Za-z][A-Za-z0-9]*(?:[-_][A-Za-z0-9]+)*\\d[A-Za-z0-9]*(?:[-_][A-Za-z0-9]+)*\\b");
     private static final String OPERATIONAL_SYSTEM_PROMPT = """
             You are an operational RecoverAI assistant.
             Answer the user's question directly and concisely using only the provided backend data.
@@ -186,10 +187,18 @@ public class GeminiServiceImpl implements GeminiService {
     private Optional<FailedMandate> resolveMandate(String question) {
         Matcher matcher = MANDATE_ID_PATTERN.matcher(question);
         while (matcher.find()) {
-            Optional<FailedMandate> mandate = failedMandateRepository.findTopByMandateIdOrderByCreatedAtDescIdDesc(matcher.group().toUpperCase(Locale.ROOT));
+            Optional<FailedMandate> mandate = findMandateByCandidate(matcher.group());
             if (mandate.isPresent()) {
                 return mandate;
             }
+        }
+
+        Optional<FailedMandate> mandateMentionedInQuestion = failedMandateRepository.findAll().stream()
+                .filter(mandate -> hasText(mandate.getMandateId()))
+                .filter(mandate -> normalizeIdentifier(question).contains(normalizeIdentifier(mandate.getMandateId())))
+                .findFirst();
+        if (mandateMentionedInQuestion.isPresent()) {
+            return mandateMentionedInQuestion;
         }
 
         String normalizedQuestion = question.toLowerCase(Locale.ROOT);
@@ -203,6 +212,38 @@ public class GeminiServiceImpl implements GeminiService {
         }
 
         return Optional.empty();
+    }
+
+    private Optional<FailedMandate> findMandateByCandidate(String candidate) {
+        String cleanedCandidate = stripIdentifierPunctuation(candidate);
+        Optional<FailedMandate> exactMatch =
+                failedMandateRepository.findTopByMandateIdOrderByCreatedAtDescIdDesc(cleanedCandidate);
+        if (exactMatch.isPresent()) {
+            return exactMatch;
+        }
+
+        String uppercaseCandidate = cleanedCandidate.toUpperCase(Locale.ROOT);
+        if (!uppercaseCandidate.equals(cleanedCandidate)) {
+            Optional<FailedMandate> uppercaseMatch =
+                    failedMandateRepository.findTopByMandateIdOrderByCreatedAtDescIdDesc(uppercaseCandidate);
+            if (uppercaseMatch.isPresent()) {
+                return uppercaseMatch;
+            }
+        }
+
+        String normalizedCandidate = normalizeIdentifier(cleanedCandidate);
+        return failedMandateRepository.findAll().stream()
+                .filter(mandate -> hasText(mandate.getMandateId()))
+                .filter(mandate -> normalizeIdentifier(mandate.getMandateId()).equals(normalizedCandidate))
+                .findFirst();
+    }
+
+    private String stripIdentifierPunctuation(String value) {
+        return value == null ? "" : value.replaceAll("^[^A-Za-z0-9]+|[^A-Za-z0-9]+$", "");
+    }
+
+    private String normalizeIdentifier(String value) {
+        return value == null ? "" : value.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
     }
 
     private String buildMerchantQuestionContext(

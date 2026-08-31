@@ -95,6 +95,69 @@ class GeminiServiceImplTest {
         assertThat(answer).doesNotContain("237", "This is an excellent example", "Why this answer is optimal", "In summary");
     }
 
+    @Test
+    void answerMerchantQuestionFindsMandateIdWithDifferentCaseAndMultipleDashes() {
+        RecoverAiProperties properties = new RecoverAiProperties(3, 20, 10, 13, null, null);
+        FailedMandateRepository failedMandateRepository = mock(FailedMandateRepository.class);
+        RecoveryDecisionRepository decisionRepository = mock(RecoveryDecisionRepository.class);
+        RecoveryOutcomeRepository recoveryOutcomeRepository = mock(RecoveryOutcomeRepository.class);
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        BatchRunRepository batchRunRepository = mock(BatchRunRepository.class);
+        MetricsService metricsService = mock(MetricsService.class);
+
+        FailedMandate mandate = FailedMandate.builder()
+                .mandateId("MND-2026-0007")
+                .merchantId("MERCHANT-DEMO")
+                .customerId("CUS-007")
+                .amount(BigDecimal.valueOf(1999))
+                .failureReason("INSUFFICIENT_BALANCE")
+                .failureCode("ERR-INSUFFICIENT_BALANCE")
+                .failureTimestamp(LocalDateTime.now())
+                .retryCount(1)
+                .maxRetries(3)
+                .mandateStatus("ACTIVE")
+                .status(PaymentStatus.FAILED)
+                .escalated(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+        RecoveryDecision decision = RecoveryDecision.builder()
+                .id(43L)
+                .mandateId("MND-2026-0007")
+                .classification("SOFT_FAILURE")
+                .recoverabilityScore(72)
+                .action("RETRY")
+                .decisionReasonCode("RETRY_RECOMMENDED")
+                .escalated(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(failedMandateRepository.findTopByMandateIdOrderByCreatedAtDescIdDesc("mnd-2026-0007")).thenReturn(Optional.empty());
+        when(failedMandateRepository.findTopByMandateIdOrderByCreatedAtDescIdDesc("MND-2026-0007")).thenReturn(Optional.of(mandate));
+        when(auditLogRepository.findByMandateIdOrderByCreatedAtAsc("MND-2026-0007")).thenReturn(List.of());
+        when(failedMandateRepository.count()).thenReturn(1L);
+        when(decisionRepository.count()).thenReturn(1L);
+        when(auditLogRepository.count()).thenReturn(0L);
+        when(recoveryOutcomeRepository.count()).thenReturn(0L);
+        when(failedMandateRepository.findAll()).thenReturn(List.of(mandate));
+        when(decisionRepository.findByMandateIdOrderByCreatedAtDesc("MND-2026-0007")).thenReturn(List.of(decision));
+        when(recoveryOutcomeRepository.findByMandateIdOrderByOutcomeTimestampDesc("MND-2026-0007")).thenReturn(List.of());
+        when(decisionRepository.findTopByMandateIdOrderByCreatedAtDesc("MND-2026-0007")).thenReturn(Optional.of(decision));
+
+        GeminiServiceImpl service = new GeminiServiceImpl(
+                properties,
+                failedMandateRepository,
+                decisionRepository,
+                recoveryOutcomeRepository,
+                auditLogRepository,
+                batchRunRepository,
+                metricsService);
+
+        String answer = service.answerMerchantQuestion("check mandate id mnd-2026-0007");
+
+        assertThat(answer).contains("MND-2026-0007", "RETRY", "RETRY_RECOMMENDED", "72");
+        assertThat(answer).doesNotContain("could not identify");
+    }
+
     private AuditLog auditLog(Long id, String stage, String message) {
         return AuditLog.builder()
                 .id(id)
