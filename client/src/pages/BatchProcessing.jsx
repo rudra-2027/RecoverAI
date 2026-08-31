@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { MetricCardSkeleton, SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton';
 import { downloadBatchReport, fetchBatches, runAllAgents, uploadBatch } from '../services/api';
 
 export default function BatchProcessing() {
@@ -10,6 +11,7 @@ export default function BatchProcessing() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStep, setUploadStep] = useState('idle'); // idle, uploading, processing, done
   const [toast, setToast] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   const percentChange = (current, previous) => {
     if (!previous && !current) return 0;
@@ -45,6 +47,7 @@ export default function BatchProcessing() {
   };
 
   const loadBatches = () => {
+    setIsLoading(true);
     fetchBatches()
       .then((data) => {
         if (data.length > 0) {
@@ -56,7 +59,8 @@ export default function BatchProcessing() {
           setSelectedBatchId('');
         }
       })
-      .catch(() => showToast('Could not load backend batches.'));
+      .catch(() => showToast('Could not load backend batches.'))
+      .finally(() => setIsLoading(false));
   };
 
   const backendBatchId = (id) => {
@@ -250,6 +254,10 @@ export default function BatchProcessing() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter mb-8">
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, index) => <MetricCardSkeleton key={`batch-metric-skeleton-${index}`} />)
+        ) : (
+          <>
         {/* Card 1 */}
         <div className="bg-surface-container-lowest rounded-lg p-5 border border-outline-variant/30 shadow-level1">
           <div className="flex items-center justify-between mb-2">
@@ -291,6 +299,8 @@ export default function BatchProcessing() {
             <TrendIndicator value={monthlyBatchTrend.revenue} type="money" />
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Complex Layout Area */}
@@ -325,7 +335,9 @@ export default function BatchProcessing() {
                 </tr>
               </thead>
               <tbody className="font-body-md text-body-md divide-y divide-outline-variant/10">
-                {filteredBatches.length === 0 ? (
+                {isLoading ? (
+                  <TableSkeletonRows rows={6} columns={7} />
+                ) : filteredBatches.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="py-8 px-5 text-center text-on-surface-variant">
                       No backend batches match this view.
@@ -365,7 +377,7 @@ export default function BatchProcessing() {
           </div>
           
           <div className="p-4 border-t border-outline-variant/30 flex justify-between items-center text-body-sm text-on-surface-variant bg-surface-container-low/20">
-            <span>Showing {filteredBatches.length} of {batches.length} batches</span>
+            <span>{isLoading ? 'Loading batches...' : `Showing ${filteredBatches.length} of ${batches.length} batches`}</span>
             <div className="flex gap-2">
               <button className="px-2 py-1 border border-outline-variant rounded hover:bg-surface-container transition-colors disabled:opacity-50" disabled>Previous</button>
               <button className="px-2 py-1 border border-outline-variant rounded hover:bg-surface-container transition-colors" disabled>Next</button>
@@ -374,7 +386,22 @@ export default function BatchProcessing() {
         </div>
 
         {/* Detail Panel Section */}
-        {activeBatch && (
+        {isLoading ? (
+          <div className="flex flex-col gap-gutter shrink-0">
+            <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-level1 p-5 space-y-6">
+              <div className="flex justify-between items-center border-b border-outline-variant/20 pb-4">
+                <SkeletonBlock className="h-5 w-32" />
+                <SkeletonBlock className="h-6 w-20" />
+              </div>
+              <SkeletonBlock className="h-20 w-full" />
+              <div className="grid grid-cols-2 gap-4">
+                <SkeletonBlock className="h-20 w-full" />
+                <SkeletonBlock className="h-20 w-full" />
+              </div>
+              <SkeletonBlock className="h-28 w-full" />
+            </div>
+          </div>
+        ) : activeBatch && (
           <div className="flex flex-col gap-gutter shrink-0">
             <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-level1 p-5 space-y-6">
               <div className="flex justify-between items-center border-b border-outline-variant/20 pb-4">

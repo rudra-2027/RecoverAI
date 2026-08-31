@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { SkeletonBlock } from '../components/LoadingSkeleton';
 import { downloadAuditCsv, fetchAuditLogs, fetchFailedMandates } from '../services/api';
 
 export default function AuditTrail() {
@@ -8,6 +9,8 @@ export default function AuditTrail() {
   const [toast, setToast] = useState('');
   const [backendMandates, setBackendMandates] = useState([]);
   const [backendLogs, setBackendLogs] = useState([]);
+  const [isLoadingMandates, setIsLoadingMandates] = useState(true);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
   const normalizeLog = (log) => ({
     id: String(log.id),
@@ -31,14 +34,17 @@ export default function AuditTrail() {
           setSelectedMandate(ids[0]);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setIsLoadingMandates(false));
   }, []);
 
   useEffect(() => {
     if (!selectedMandate) return;
+    setIsLoadingLogs(true);
     fetchAuditLogs(selectedMandate)
       .then((data) => setBackendLogs(data.map(normalizeLog)))
-      .catch(() => setBackendLogs([]));
+      .catch(() => setBackendLogs([]))
+      .finally(() => setIsLoadingLogs(false));
   }, [selectedMandate]);
 
   const logs = backendLogs;
@@ -90,7 +96,8 @@ export default function AuditTrail() {
                 onChange={(e) => setSelectedMandate(e.target.value)}
                 className="bg-surface-container-highest border border-outline-variant rounded px-2 py-0.5 font-code text-code text-on-surface font-semibold focus:outline-none focus:border-primary cursor-pointer"
               >
-                {mandateOptions.length === 0 && <option value="">No mandates</option>}
+                {isLoadingMandates && <option value="">Loading mandates</option>}
+                {!isLoadingMandates && mandateOptions.length === 0 && <option value="">No mandates</option>}
                 {mandateOptions.map((mandateId) => (
                   <option key={mandateId} value={mandateId}>{mandateId}</option>
                 ))}
@@ -123,7 +130,26 @@ export default function AuditTrail() {
         {/* Timeline Surface */}
         <div className="bg-surface border border-outline-variant/40 rounded-xl shadow-level1 p-stack-lg relative">
           
-          {filteredLogs.length === 0 ? (
+          {isLoadingLogs ? (
+            <div className="relative pl-6">
+              <div className="absolute left-[7px] top-4 bottom-4 w-px bg-outline-variant opacity-50"></div>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={`timeline-skeleton-${index}`} className="relative mb-stack-lg last:mb-0">
+                  <div className="absolute -left-[30px] top-4 w-[14px] h-[14px] rounded-full bg-surface border-2 border-outline-variant z-10 ring-4 ring-surface"></div>
+                  <div className="flex flex-col md:flex-row items-start gap-4">
+                    <div className="w-24 pt-3 space-y-2">
+                      <SkeletonBlock className="h-4 w-16" />
+                      <SkeletonBlock className="h-3 w-20" />
+                    </div>
+                    <div className="flex-grow w-full border rounded-lg bg-surface-container-lowest border-outline-variant/30 p-4 space-y-3">
+                      <SkeletonBlock className="h-5 w-44" />
+                      <SkeletonBlock className="h-4 w-full" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredLogs.length === 0 ? (
             <div className="text-center py-8 text-on-surface-variant">
               No timeline items match the selected event source filters.
             </div>
@@ -132,7 +158,7 @@ export default function AuditTrail() {
               {/* Vertical Line */}
               <div className="absolute left-[7px] top-4 bottom-4 w-px bg-outline-variant opacity-50"></div>
 
-              {filteredLogs.map((log, index) => {
+              {filteredLogs.map((log) => {
                 const isExpanded = expandedEvents[log.id];
                 return (
                   <div key={log.id} className="relative mb-stack-lg last:mb-0">

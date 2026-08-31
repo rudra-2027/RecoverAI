@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton';
 import { confirmDecision, fetchDecisions, overrideDecision, processDecisionBatch } from '../services/api';
 
 export default function RecoveryDecisions() {
@@ -7,6 +8,7 @@ export default function RecoveryDecisions() {
   const [filterActive, setFilterActive] = useState(false);
   const [decisionFilter, setDecisionFilter] = useState('ALL');
   const [toast, setToast] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   const displayAction = (action) => action === 'CANCEL_MANDATE' ? 'CANCEL' : action;
 
@@ -38,7 +40,8 @@ export default function RecoveryDecisions() {
         setDecisions(normalized);
         setSelectedId(normalized[0]?.id || '');
       })
-      .catch(() => showToast('Could not load backend decisions.'));
+      .catch(() => showToast('Could not load backend decisions.'))
+      .finally(() => setIsLoading(false));
   }, []);
 
   // Find active decision item details
@@ -156,7 +159,9 @@ export default function RecoveryDecisions() {
                 </tr>
               </thead>
               <tbody className="font-body-sm text-body-sm divide-y divide-outline-variant/20">
-                {filteredDecisions.length === 0 ? (
+                {isLoading ? (
+                  <TableSkeletonRows rows={7} columns={5} />
+                ) : filteredDecisions.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="py-8 px-4 text-center text-on-surface-variant">
                       No backend recovery decisions match this view.
@@ -201,7 +206,23 @@ export default function RecoveryDecisions() {
         </div>
 
         {/* Right Side Details Drawer */}
-        {activeItem && (
+        {isLoading ? (
+          <aside className="w-full lg:w-96 shrink-0 bg-surface-container-lowest rounded-xl border border-outline-variant/40 shadow-level2 flex flex-col overflow-hidden z-20">
+            <div className="p-4 border-b border-outline-variant/40 bg-surface-container-low space-y-2">
+              <SkeletonBlock className="h-5 w-36" />
+              <SkeletonBlock className="h-4 w-28" />
+            </div>
+            <div className="p-4 flex flex-col gap-stack-md">
+              <SkeletonBlock className="h-28 w-full" />
+              <div className="grid grid-cols-2 gap-3">
+                <SkeletonBlock className="h-24 w-full" />
+                <SkeletonBlock className="h-24 w-full" />
+              </div>
+              <SkeletonBlock className="h-32 w-full" />
+              <SkeletonBlock className="h-24 w-full" />
+            </div>
+          </aside>
+        ) : activeItem && (
           <aside className="w-full lg:w-96 shrink-0 bg-surface-container-lowest rounded-xl border border-outline-variant/40 shadow-level2 flex flex-col overflow-y-auto z-20">
             {/* Drawer Header */}
             <div className="p-4 border-b border-outline-variant/40 flex justify-between items-center bg-surface-container-low sticky top-0 z-10">

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { SummaryCardSkeleton } from '../components/LoadingSkeleton';
 import { askAi, fetchAiInsights, fetchAiSummary } from '../services/api';
 
 const META_RESPONSE_MARKERS = [
@@ -55,6 +56,7 @@ export default function AIInsights() {
 
   const [inputVal, setInputVal] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoadingSummaries, setIsLoadingSummaries] = useState(true);
   const chatScrollRef = useRef(null);
 
   // Auto-scroll to bottom of chat
@@ -82,7 +84,7 @@ export default function AIInsights() {
       if (backendSummaries.length > 0) {
         setSummaries(backendSummaries);
       }
-    });
+    }).finally(() => setIsLoadingSummaries(false));
   }, []);
 
   const handleSend = async (text) => {
@@ -127,7 +129,12 @@ export default function AIInsights() {
             Executive Summaries
           </h3>
 
-          {summaries.length === 0 ? (
+          {isLoadingSummaries ? (
+            <>
+              <SummaryCardSkeleton />
+              <SummaryCardSkeleton />
+            </>
+          ) : summaries.length === 0 ? (
             <div className="bg-surface rounded-xl p-6 border border-outline-variant/30 text-center text-on-surface-variant">
               All executive summaries have been processed or dismissed.
             </div>

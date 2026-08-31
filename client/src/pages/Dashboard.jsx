@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { MetricCardSkeleton, SkeletonBlock } from '../components/LoadingSkeleton';
 import { fetchMetrics, fetchMetricTrends } from '../services/api';
 
 export default function Dashboard() {
@@ -7,6 +8,7 @@ export default function Dashboard() {
   const [metrics, setMetrics] = useState(null);
   const [metricTrends, setMetricTrends] = useState([]);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([fetchMetrics(), fetchMetricTrends()])
@@ -14,7 +16,8 @@ export default function Dashboard() {
         setMetrics(metricsResponse);
         setMetricTrends(trendsResponse || []);
       })
-      .catch(() => setError('Backend metrics are unavailable right now.'));
+      .catch(() => setError('Backend metrics are unavailable right now.'))
+      .finally(() => setIsLoading(false));
   }, []);
 
   const money = (value) => new Intl.NumberFormat('en-US', {
@@ -88,7 +91,16 @@ export default function Dashboard() {
             <span className="text-xs bg-[#f3e8ff] text-[#6b21a8] px-2 py-0.5 rounded-full font-label-md">High Confidence</span>
           </h3>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Backend scoring is reporting an average recovery probability of <strong className="text-on-surface font-semibold">{percent(metrics?.averageRecoveryProbability)}</strong> with <strong className="text-on-surface font-semibold">{Number(metrics?.highValueCustomers || 0).toLocaleString()}</strong> high-value customers currently tracked.
+            {isLoading ? (
+              <span className="block space-y-2">
+                <SkeletonBlock className="h-4 w-full max-w-xl" />
+                <SkeletonBlock className="h-4 w-64" />
+              </span>
+            ) : (
+              <>
+                Backend scoring is reporting an average recovery probability of <strong className="text-on-surface font-semibold">{percent(metrics?.averageRecoveryProbability)}</strong> with <strong className="text-on-surface font-semibold">{Number(metrics?.highValueCustomers || 0).toLocaleString()}</strong> high-value customers currently tracked.
+              </>
+            )}
           </p>
         </div>
         <div className="shrink-0">
@@ -107,6 +119,10 @@ export default function Dashboard() {
 
       {/* KPIs Bento Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-stack-md mb-stack-lg">
+        {isLoading ? (
+          Array.from({ length: 5 }).map((_, index) => <MetricCardSkeleton key={`metric-skeleton-${index}`} />)
+        ) : (
+          <>
         {/* Card 1 */}
         <div className="bg-surface-container-lowest rounded-xl p-5 shadow-level1 border border-outline-variant/30 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
@@ -167,6 +183,8 @@ export default function Dashboard() {
             <div className="font-body-sm text-body-sm text-[#7e22ce] mt-1">Above baseline</div>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Main Data Area */}
@@ -178,6 +196,16 @@ export default function Dashboard() {
             <span className="text-body-sm text-secondary">Monthly backend trend</span>
           </div>
           <div className="h-72 w-full">
+            {isLoading ? (
+              <div className="h-full w-full flex flex-col justify-end gap-4 pt-6">
+                <SkeletonBlock className="h-4 w-48" />
+                <div className="grid grid-cols-6 gap-3 items-end flex-1">
+                  {[45, 65, 52, 78, 60, 88].map((height, index) => (
+                    <SkeletonBlock key={`chart-skeleton-${index}`} className="w-full rounded-t-lg" style={{ height: `${height}%` }} />
+                  ))}
+                </div>
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
@@ -211,6 +239,7 @@ export default function Dashboard() {
                 <Area type="monotone" dataKey="AI Recovered" stroke="#8a2be2" fillOpacity={1} fill="url(#colorAi)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -218,6 +247,18 @@ export default function Dashboard() {
         <div className="bg-surface-container-lowest rounded-xl p-6 shadow-level1 border border-outline-variant/30">
           <h3 className="font-title-lg text-title-lg text-on-surface mb-6">Recovery Funnel</h3>
           <div className="flex flex-col gap-6">
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <div key={`funnel-skeleton-${index}`} className="space-y-2">
+                  <div className="flex justify-between">
+                    <SkeletonBlock className="h-4 w-24" />
+                    <SkeletonBlock className="h-4 w-16" />
+                  </div>
+                  <SkeletonBlock className="h-2 w-full rounded-full" />
+                </div>
+              ))
+            ) : (
+              <>
             {/* Step 1 */}
             <div>
               <div className="flex justify-between items-baseline mb-2">
@@ -272,6 +313,8 @@ export default function Dashboard() {
                 <div className="h-full bg-primary rounded-full" style={{ width: percentWidth(recoveredCount, processedCount) }}></div>
               </div>
             </div>
+              </>
+            )}
           </div>
         </div>
       </div>

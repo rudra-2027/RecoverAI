@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { TableSkeletonRows } from '../components/LoadingSkeleton';
 import { downloadFailedMandatesCsv, fetchFailedMandates, runAgent, runAllAgents } from '../services/api';
 
 export default function FailedMandates() {
@@ -21,6 +22,7 @@ export default function FailedMandates() {
   });
 
   const [mandates, setMandates] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Filters State
   const [search, setSearch] = useState('');
@@ -36,7 +38,8 @@ export default function FailedMandates() {
   useEffect(() => {
     fetchFailedMandates()
       .then((data) => setMandates(data.map(normalizeMandate)))
-      .catch(() => showToast('Could not load failed mandates from backend.'));
+      .catch(() => showToast('Could not load failed mandates from backend.'))
+      .finally(() => setIsLoading(false));
   }, []);
 
   const merchantOptions = useMemo(
@@ -285,7 +288,9 @@ export default function FailedMandates() {
               </tr>
             </thead>
             <tbody className="font-body-sm text-body-sm divide-y divide-outline-variant/20">
-              {filteredMandates.length === 0 ? (
+              {isLoading ? (
+                <TableSkeletonRows rows={6} columns={9} />
+              ) : filteredMandates.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="p-8 text-center text-on-surface-variant">
                     No failed mandates match the active filter criteria.
@@ -363,7 +368,7 @@ export default function FailedMandates() {
         {/* Pagination Footer */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-outline-variant/30 bg-surface">
           <span className="font-body-sm text-body-sm text-on-surface-variant">
-            Showing {filteredMandates.length} of {mandates.length} mandates
+            {isLoading ? 'Loading mandates...' : `Showing ${filteredMandates.length} of ${mandates.length} mandates`}
           </span>
           <div className="flex gap-1">
             <button className="p-1 text-outline-variant hover:text-on-surface disabled:opacity-50" disabled>

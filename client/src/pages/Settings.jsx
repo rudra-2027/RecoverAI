@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { SkeletonBlock } from '../components/LoadingSkeleton';
 import {
   fetchMerchants,
   fetchRecoverySettings,
@@ -23,11 +24,13 @@ export default function Settings() {
   const [apiKey, setApiKey] = useState('API key is managed by backend configuration');
   const [keyHidden, setKeyHidden] = useState(true);
   const [systemStatus, setSystemStatus] = useState(null);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   // Toast
   const [toast, setToast] = useState('');
 
   const loadSettings = () => {
+    setIsLoadingSettings(true);
     Promise.allSettled([fetchMerchants(), fetchRecoverySettings(), fetchSystemStatus()])
       .then(([merchantResult, settingsResult, statusResult]) => {
         if (merchantResult.status === 'fulfilled') {
@@ -48,7 +51,8 @@ export default function Settings() {
           setSystemStatus(statusResult.value);
         }
       })
-      .catch(() => showToast('Could not load settings from backend.'));
+      .catch(() => showToast('Could not load settings from backend.'))
+      .finally(() => setIsLoadingSettings(false));
   };
 
   useEffect(() => {
@@ -243,7 +247,17 @@ export default function Settings() {
                 <p className="font-body-md text-body-md text-on-surface-variant">Enable or disable automated recovery loops for individual merchant subscriptions.</p>
                 
                 <div className="divide-y divide-[#f0f0f0] border border-[#f0f0f0] rounded-xl overflow-hidden bg-surface-container-lowest">
-                  {merchants.length === 0 ? (
+                  {isLoadingSettings ? (
+                    Array.from({ length: 4 }).map((_, index) => (
+                      <div key={`merchant-skeleton-${index}`} className="flex justify-between items-center p-4">
+                        <div className="space-y-2">
+                          <SkeletonBlock className="h-4 w-40" />
+                          <SkeletonBlock className="h-3 w-28" />
+                        </div>
+                        <SkeletonBlock className="h-6 w-11 rounded-full" />
+                      </div>
+                    ))
+                  ) : merchants.length === 0 ? (
                     <div className="p-4 text-center text-on-surface-variant">
                       No backend merchants configured.
                     </div>
@@ -329,6 +343,18 @@ export default function Settings() {
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {isLoadingSettings ? (
+                    Array.from({ length: 4 }).map((_, index) => (
+                      <div key={`status-skeleton-${index}`} className="flex items-center justify-between p-4 border border-[#f0f0f0] rounded-lg bg-surface-container-lowest shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <SkeletonBlock className="h-6 w-6 rounded-full" />
+                          <SkeletonBlock className="h-4 w-36" />
+                        </div>
+                        <SkeletonBlock className="h-4 w-20" />
+                      </div>
+                    ))
+                  ) : (
+                    <>
                   <div className="flex items-center justify-between p-4 border border-[#f0f0f0] rounded-lg bg-surface-container-lowest shadow-sm">
                     <div className="flex items-center gap-3">
                       <span className="material-symbols-outlined text-green-600">check_circle</span>
@@ -357,6 +383,8 @@ export default function Settings() {
                     </div>
                     <span className="font-code text-code text-green-600 font-bold">{systemStatus?.apiKeyEnabled ? 'API key enabled' : 'API key disabled'}</span>
                   </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}

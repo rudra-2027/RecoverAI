@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { MetricCardSkeleton, SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton';
 import { fetchMetrics, fetchOutcomes } from '../services/api';
 
 export default function RecoveryOutcomes() {
@@ -34,15 +35,18 @@ export default function RecoveryOutcomes() {
   const [refreshing, setRefreshing] = useState(false);
   const [outcomes, setOutcomes] = useState([]);
   const [metrics, setMetrics] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const loadOutcomes = async () => {
+    setIsLoading(true);
     const [outcomeData, metricData] = await Promise.all([fetchOutcomes(), fetchMetrics()]);
     setOutcomes(outcomeData.map(normalizeOutcome));
     setMetrics(metricData);
+    setIsLoading(false);
   };
 
   useEffect(() => {
-    loadOutcomes().catch(() => {});
+    loadOutcomes().catch(() => setIsLoading(false));
   }, []);
 
   const filteredOutcomes = useMemo(() => {
@@ -184,6 +188,10 @@ export default function RecoveryOutcomes() {
 
         {/* Metrics Bento */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, index) => <MetricCardSkeleton key={`outcome-metric-skeleton-${index}`} />)
+          ) : (
+            <>
           {/* Metric 1 */}
           <div className="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/30 shadow-level1 flex flex-col justify-between h-32 relative overflow-hidden group">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary-container opacity-10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
@@ -225,6 +233,8 @@ export default function RecoveryOutcomes() {
               <span className="text-sm text-[#a855f7] flex items-center font-semibold">Avg Probability</span>
             </div>
           </div>
+            </>
+          )}
         </div>
 
         {/* Charts & Breakdown */}
@@ -232,6 +242,13 @@ export default function RecoveryOutcomes() {
           <div className="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/30 shadow-level1 lg:col-span-2">
             <h3 className="font-title-lg text-title-lg text-on-surface mb-6">Recovered Volume by Strategy ($)</h3>
             <div className="h-64 w-full">
+              {isLoading ? (
+                <div className="grid grid-cols-6 gap-3 items-end h-full">
+                  {[38, 70, 50, 82, 58, 66].map((height, index) => (
+                    <SkeletonBlock key={`outcome-chart-skeleton-${index}`} className="w-full rounded-t-lg" style={{ height: `${height}%` }} />
+                  ))}
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#c4c5d8" opacity={0.3} />
@@ -253,10 +270,20 @@ export default function RecoveryOutcomes() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </div>
           </div>
 
           <div className="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/30 shadow-level1 flex flex-col justify-between">
+            {isLoading ? (
+              <div className="space-y-4">
+                <SkeletonBlock className="h-5 w-40" />
+                <SkeletonBlock className="h-4 w-full" />
+                <SkeletonBlock className="h-4 w-full" />
+                <SkeletonBlock className="h-4 w-3/4" />
+              </div>
+            ) : (
+            <>
             <div>
               <h3 className="font-title-lg text-title-lg text-on-surface mb-4">Outcome Distribution</h3>
               <div className="space-y-4">
@@ -291,6 +318,8 @@ export default function RecoveryOutcomes() {
                 Backend success rate is currently <strong>{Number(metrics?.retrySuccessRate || 0).toFixed(1)}%</strong>.
               </p>
             </div>
+            </>
+            )}
           </div>
         </div>
 
@@ -348,7 +377,9 @@ export default function RecoveryOutcomes() {
                 </tr>
               </thead>
               <tbody className="font-body-md text-body-md text-on-surface divide-y divide-outline-variant/10">
-                {filteredOutcomes.length === 0 ? (
+                {isLoading ? (
+                  <TableSkeletonRows rows={6} columns={7} />
+                ) : filteredOutcomes.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="px-6 py-8 text-center text-on-surface-variant">
                       No records match the active filter options.
