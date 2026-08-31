@@ -186,7 +186,7 @@ public class GeminiServiceImpl implements GeminiService {
     private Optional<FailedMandate> resolveMandate(String question) {
         Matcher matcher = MANDATE_ID_PATTERN.matcher(question);
         while (matcher.find()) {
-            Optional<FailedMandate> mandate = failedMandateRepository.findByMandateId(matcher.group().toUpperCase(Locale.ROOT));
+            Optional<FailedMandate> mandate = failedMandateRepository.findTopByMandateIdOrderByCreatedAtDescIdDesc(matcher.group().toUpperCase(Locale.ROOT));
             if (mandate.isPresent()) {
                 return mandate;
             }
@@ -195,7 +195,7 @@ public class GeminiServiceImpl implements GeminiService {
         String normalizedQuestion = question.toLowerCase(Locale.ROOT);
         if (normalizedQuestion.contains("escalat")) {
             Optional<FailedMandate> latestEscalatedMandate = decisionRepository.findTopByEscalatedTrueOrderByCreatedAtDesc()
-                    .flatMap(decision -> failedMandateRepository.findByMandateId(decision.getMandateId()));
+                    .flatMap(decision -> failedMandateRepository.findTopByMandateIdOrderByCreatedAtDescIdDesc(decision.getMandateId()));
             if (latestEscalatedMandate.isPresent()) {
                 return latestEscalatedMandate;
             }

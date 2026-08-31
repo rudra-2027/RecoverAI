@@ -31,7 +31,7 @@ public class AgentController {
 
         FailedMandate mandate =
                 failedMandateRepository
-                        .findByMandateId(mandateId)
+                        .findTopByMandateIdOrderByCreatedAtDescIdDesc(mandateId)
                         .orElseThrow(() -> new ResourceNotFoundException("Mandate not found: " + mandateId));
 
         return revenueRecoveryAgent.run(mandate);

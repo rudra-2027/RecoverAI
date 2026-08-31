@@ -70,7 +70,7 @@ class GeminiServiceImplTest {
 
         when(decisionRepository.findTopByEscalatedTrueOrderByCreatedAtDesc()).thenReturn(Optional.of(decision));
         when(decisionRepository.findTopByMandateIdOrderByCreatedAtDesc("MND-0007")).thenReturn(Optional.of(decision));
-        when(failedMandateRepository.findByMandateId("MND-0007")).thenReturn(Optional.of(mandate));
+        when(failedMandateRepository.findTopByMandateIdOrderByCreatedAtDescIdDesc("MND-0007")).thenReturn(Optional.of(mandate));
         when(auditLogRepository.findByMandateIdOrderByCreatedAtAsc("MND-0007")).thenReturn(logs);
         when(failedMandateRepository.count()).thenReturn(1L);
         when(decisionRepository.count()).thenReturn(1L);

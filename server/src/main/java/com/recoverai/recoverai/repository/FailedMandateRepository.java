@@ -1,7 +1,7 @@
 package com.recoverai.recoverai.repository;
 
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -12,7 +12,7 @@ import com.recoverai.recoverai.entity.PaymentStatus;
 @Repository
 public interface FailedMandateRepository extends JpaRepository<FailedMandate, Long>{
 
-    Optional<FailedMandate> findByMandateId(String mandateId);
+    Optional<FailedMandate> findTopByMandateIdOrderByCreatedAtDescIdDesc(String mandateId);
 
     Optional<FailedMandate> findTopByEscalatedTrueOrderByCreatedAtDesc();
 

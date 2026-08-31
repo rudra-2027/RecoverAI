@@ -132,7 +132,7 @@ public class IngestionController {
                 .build();
         PaymentHistory saved = paymentHistoryRepository.save(history);
         if (saved.getStatus() == PaymentStatus.SUCCESS) {
-            failedMandateRepository.findByMandateId(saved.getMandateId()).ifPresent(mandate -> {
+            failedMandateRepository.findTopByMandateIdOrderByCreatedAtDescIdDesc(saved.getMandateId()).ifPresent(mandate -> {
                 mandate.setStatus(PaymentStatus.SUCCESS);
                 mandate.setNextRetryAt(null);
                 failedMandateRepository.save(mandate);

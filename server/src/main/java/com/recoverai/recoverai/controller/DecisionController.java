@@ -72,7 +72,7 @@ public class DecisionController {
             @PathVariable String mandateId,
             @Valid @RequestBody DecisionOverrideRequest request) {
         log.info("Manual decision override requested for mandateId={}, action={}", mandateId, request.action());
-        FailedMandate mandate = failedMandateRepository.findByMandateId(mandateId)
+        FailedMandate mandate = failedMandateRepository.findTopByMandateIdOrderByCreatedAtDescIdDesc(mandateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Mandate not found: " + mandateId));
 
         RecoveryDecision decision = RecoveryDecision.builder()
@@ -114,7 +114,7 @@ public class DecisionController {
     public List<RecoveryResult> processBatch(@Valid @RequestBody ProcessBatchDecisionsRequest request) {
         log.info("Decision batch processing requested for {} mandates", request.mandateIds().size());
         return request.mandateIds().stream()
-                .map(mandateId -> failedMandateRepository.findByMandateId(mandateId)
+                .map(mandateId -> failedMandateRepository.findTopByMandateIdOrderByCreatedAtDescIdDesc(mandateId)
                         .orElseThrow(() -> new ResourceNotFoundException("Mandate not found: " + mandateId)))
                 .filter(mandate -> mandate.getStatus() == PaymentStatus.FAILED)
                 .filter(mandate -> outcomeRepository.findByMandateIdOrderByOutcomeTimestampDesc(mandate.getMandateId()).stream()
