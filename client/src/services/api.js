@@ -47,6 +47,8 @@ export const regenerateApiKey = () => api.post('/settings/api-key/regenerate').t
   return res.data;
 });
 export const simulateRecovery = (mandate) => api.post('/simulator/recovery', { mandate }).then((res) => res.data);
+export const createFeedback = (payload) => api.post('/feedback', payload).then((res) => res.data);
+export const fetchFeedback = () => api.get('/feedback').then((res) => res.data);
 
 export const downloadBlob = async (url, fallbackFileName) => {
   const response = await api.get(url, { responseType: 'blob' });

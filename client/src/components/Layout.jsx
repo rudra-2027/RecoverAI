@@ -11,6 +11,7 @@ export default function Layout() {
     { name: 'Batch Processing', path: '/batch-processing', icon: 'inventory_2' },
     { name: 'AI Insights', path: '/ai-insights', icon: 'auto_awesome' },
     { name: 'Demo Simulator', path: '/demo-simulator', icon: 'precision_manufacturing' },
+    { name: 'Feedback', path: '/feedback', icon: 'rate_review' },
     //{ name: 'Settings', path: '/settings', icon: 'settings' }
   ];
 

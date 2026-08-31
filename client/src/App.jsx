@@ -10,6 +10,7 @@ import BatchProcessing from './pages/BatchProcessing';
 import AIInsights from './pages/AIInsights';
 import DemoSimulator from './pages/DemoSimulator';
 import Settings from './pages/Settings';
+import Feedback from './pages/Feedback';
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="batch-processing" element={<BatchProcessing />} />
           <Route path="ai-insights" element={<AIInsights />} />
           <Route path="demo-simulator" element={<DemoSimulator />} />
+          <Route path="feedback" element={<Feedback />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
