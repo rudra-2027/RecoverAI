@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SummaryCardSkeleton } from '../components/LoadingSkeleton';
+import { ButtonLoader, SummaryCardSkeleton } from '../components/LoadingSkeleton';
 import { askAi, fetchAiInsights, fetchAiSummary } from '../services/api';
 
 const META_RESPONSE_MARKERS = [
@@ -103,6 +103,7 @@ export default function AIInsights() {
 
   const [inputVal, setInputVal] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [activeAiAction, setActiveAiAction] = useState('');
   const [isLoadingSummaries, setIsLoadingSummaries] = useState(true);
   const chatScrollRef = useRef(null);
 
@@ -134,12 +135,13 @@ export default function AIInsights() {
     }).finally(() => setIsLoadingSummaries(false));
   }, []);
 
-  const handleSend = async (text) => {
-    if (!text.trim()) return;
+  const handleSend = async (text, actionKey = 'chat') => {
+    if (!text.trim() || isTyping) return;
     const userMsg = { sender: 'user', text };
     setMessages(prev => [...prev, userMsg]);
     setInputVal('');
     setIsTyping(true);
+    setActiveAiAction(actionKey);
 
     try {
       const response = await askAi(text);
@@ -148,6 +150,8 @@ export default function AIInsights() {
     } catch {
       setIsTyping(false);
       setMessages(prev => [...prev, { sender: 'ai', text: 'The backend AI service is unavailable right now.' }]);
+    } finally {
+      setActiveAiAction('');
     }
   };
 
@@ -216,11 +220,13 @@ export default function AIInsights() {
                   <div className="mt-4 flex gap-2 shrink-0">
                     <button
                       onClick={() => {
-                        handleSend(`Apply optimization for: ${item.title}`);
+                        handleSend(`Apply optimization for: ${item.title}`, `summary-${item.id}`);
                         handleDismissSummary(item.id);
                       }}
-                      className="font-label-md text-label-md text-primary hover:bg-primary-container/20 px-3 py-1.5 rounded transition-colors border border-primary/20 bg-white shadow-sm font-semibold"
+                      disabled={isTyping}
+                      className="font-label-md text-label-md text-primary hover:bg-primary-container/20 px-3 py-1.5 rounded transition-colors border border-primary/20 bg-white shadow-sm font-semibold flex items-center gap-2 disabled:opacity-50"
                     >
+                      {activeAiAction === `summary-${item.id}` && <ButtonLoader className="h-3 w-3" />}
                       Apply Strategy
                     </button>
                     <button
@@ -308,9 +314,11 @@ export default function AIInsights() {
                   {msg.actions && (
                     <div className="flex gap-2 mt-3">
                       <button 
-                        onClick={() => handleSend('Initiate retry for the latest backend technical failures')}
-                        className="font-label-md text-label-md text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded border border-primary/20 transition-colors font-bold bg-white"
+                        onClick={() => handleSend('Initiate retry for the latest backend technical failures', 'latest-retry')}
+                        disabled={isTyping}
+                        className="font-label-md text-label-md text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded border border-primary/20 transition-colors font-bold bg-white flex items-center gap-2 disabled:opacity-50"
                       >
+                        {activeAiAction === 'latest-retry' && <ButtonLoader className="h-3 w-3" />}
                         Initiate Retry
                       </button>
                     </div>
@@ -338,45 +346,51 @@ export default function AIInsights() {
             {/* Suggested Prompts */}
             <div className="px-stack-md py-stack-sm flex gap-2 overflow-x-auto chat-scroll max-w-full">
               <button 
-                onClick={() => handleSend('Why are payments failing?')}
-                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
+                onClick={() => handleSend('Why are payments failing?', 'prompt-failures')}
+                disabled={isTyping}
+                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[14px]">troubleshoot</span>
+                {activeAiAction === 'prompt-failures' ? <ButtonLoader className="h-3 w-3" /> : <span className="material-symbols-outlined text-[14px]">troubleshoot</span>}
                 Why are payments failing?
               </button>
               <button 
-                onClick={() => handleSend('How is recovery performing?')}
-                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
+                onClick={() => handleSend('How is recovery performing?', 'prompt-performance')}
+                disabled={isTyping}
+                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[14px]">monitoring</span>
+                {activeAiAction === 'prompt-performance' ? <ButtonLoader className="h-3 w-3" /> : <span className="material-symbols-outlined text-[14px]">monitoring</span>}
                 Recovery performance
               </button>
               <button 
-                onClick={() => handleSend('How did the latest batch perform?')}
-                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
+                onClick={() => handleSend('How did the latest batch perform?', 'prompt-batch')}
+                disabled={isTyping}
+                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[14px]">summarize</span>
+                {activeAiAction === 'prompt-batch' ? <ButtonLoader className="h-3 w-3" /> : <span className="material-symbols-outlined text-[14px]">summarize</span>}
                 Latest batch
               </button>
               <button 
-                onClick={() => handleSend('Which customers are highest risk?')}
-                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
+                onClick={() => handleSend('Which customers are highest risk?', 'prompt-risk')}
+                disabled={isTyping}
+                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[14px]">warning</span>
+                {activeAiAction === 'prompt-risk' ? <ButtonLoader className="h-3 w-3" /> : <span className="material-symbols-outlined text-[14px]">warning</span>}
                 Highest risk customers
               </button>
               <button 
-                onClick={() => handleSend('Which merchants have the most failures?')}
-                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
+                onClick={() => handleSend('Which merchants have the most failures?', 'prompt-merchants')}
+                disabled={isTyping}
+                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[14px]">storefront</span>
+                {activeAiAction === 'prompt-merchants' ? <ButtonLoader className="h-3 w-3" /> : <span className="material-symbols-outlined text-[14px]">storefront</span>}
                 Merchant failures
               </button>
               <button 
-                onClick={() => handleSend('Check Mandate M0016')}
-                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
+                onClick={() => handleSend('Check Mandate M0016', 'prompt-m0016')}
+                disabled={isTyping}
+                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[14px]">assignment_late</span>
+                {activeAiAction === 'prompt-m0016' ? <ButtonLoader className="h-3 w-3" /> : <span className="material-symbols-outlined text-[14px]">assignment_late</span>}
                 Check M0016
               </button>
             </div>
@@ -388,7 +402,7 @@ export default function AIInsights() {
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSend(inputVal);
+                    if (e.key === 'Enter') handleSend(inputVal, 'chat');
                   }}
                   className="w-full bg-surface border border-outline-variant rounded-xl pl-4 pr-10 py-3 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary transition-colors resize-none overflow-hidden block" 
                   placeholder="Ask RecoverAI about trends, batches, or specific mandates..." 
@@ -398,10 +412,11 @@ export default function AIInsights() {
                 </button>
               </div>
               <button 
-                onClick={() => handleSend(inputVal)}
-                className="w-12 h-12 rounded-xl bg-primary hover:bg-on-primary-fixed-variant text-on-primary flex items-center justify-center shrink-0 transition-colors shadow-sm"
+                onClick={() => handleSend(inputVal, 'chat')}
+                disabled={isTyping || !inputVal.trim()}
+                className="w-12 h-12 rounded-xl bg-primary hover:bg-on-primary-fixed-variant text-on-primary flex items-center justify-center shrink-0 transition-colors shadow-sm disabled:opacity-50"
               >
-                <span className="material-symbols-outlined fill text-white">send</span>
+                {activeAiAction === 'chat' ? <ButtonLoader /> : <span className="material-symbols-outlined fill text-white">send</span>}
               </button>
             </div>
           </div>

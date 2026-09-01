@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { MetricCardSkeleton, SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton';
+import { ButtonLoader, MetricCardSkeleton, SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton';
 import { fetchMetrics, fetchOutcomes } from '../services/api';
 
 export default function RecoveryOutcomes() {
@@ -179,8 +179,10 @@ export default function RecoveryOutcomes() {
             </button>
             <button 
               onClick={handleRefresh}
-              className={`flex-1 sm:flex-none px-4 py-2 bg-primary text-on-primary rounded-lg font-title-md text-title-md hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-2 ${refreshing ? 'opacity-50 pointer-events-none' : ''}`}
+              disabled={refreshing}
+              className="flex-1 sm:flex-none px-4 py-2 bg-primary text-on-primary rounded-lg font-title-md text-title-md hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
             >
+              {refreshing && <ButtonLoader />}
               {refreshing ? 'Refreshing...' : 'Refresh Data'}
             </button>
           </div>

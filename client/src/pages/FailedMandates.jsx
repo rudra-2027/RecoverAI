@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { TableSkeletonRows } from '../components/LoadingSkeleton';
+import { ButtonLoader, TableSkeletonRows } from '../components/LoadingSkeleton';
 import { downloadFailedMandatesCsv, fetchFailedMandates, runAgent, runAllAgents } from '../services/api';
 
 export default function FailedMandates() {
@@ -34,6 +34,10 @@ export default function FailedMandates() {
   // Modal / Toast State
   const [detailModalItem, setDetailModalItem] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
+  const [runningMandateId, setRunningMandateId] = useState('');
+  const [isBulkRunning, setIsBulkRunning] = useState(false);
+  const [isRunningAll, setIsRunningAll] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     fetchFailedMandates()
@@ -94,40 +98,52 @@ export default function FailedMandates() {
   };
 
   const triggerAIAgent = async (id) => {
+    setRunningMandateId(id);
     try {
       const result = await runAgent(id);
       showToast(`AI agent completed for ${id}: ${result.action} / ${result.outcome}.`);
     } catch {
       showToast(`AI agent could not run for ${id}.`);
+    } finally {
+      setRunningMandateId('');
     }
   };
 
   const handleBulkAction = async () => {
     if (selectedRows.length === 0) return;
+    setIsBulkRunning(true);
     try {
       await Promise.all(selectedRows.map((id) => runAgent(id)));
       showToast(`Bulk processing completed for ${selectedRows.length} mandates.`);
       setSelectedRows([]);
     } catch {
       showToast('Bulk processing failed for one or more mandates.');
+    } finally {
+      setIsBulkRunning(false);
     }
   };
 
   const handleRunAll = async () => {
+    setIsRunningAll(true);
     try {
       const result = await runAllAgents();
       showToast(`Batch completed: ${result.successfulRecoveries}/${result.totalProcessed} recovered.`);
     } catch {
       showToast('Batch agent could not run.');
+    } finally {
+      setIsRunningAll(false);
     }
   };
 
   const handleExport = async () => {
+    setIsExporting(true);
     try {
       await downloadFailedMandatesCsv();
       showToast('Failed mandates CSV downloaded.');
     } catch {
       showToast('Could not export failed mandates.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -158,16 +174,19 @@ export default function FailedMandates() {
         <div className="flex gap-3 w-full sm:w-auto">
           <button 
             onClick={handleExport}
-            className="flex-1 sm:flex-none px-4 py-2 bg-surface text-primary border border-outline-variant rounded font-label-md text-label-md hover:bg-surface-container transition-colors shadow-sm"
+            disabled={isExporting}
+            className="flex-1 sm:flex-none px-4 py-2 bg-surface text-primary border border-outline-variant rounded font-label-md text-label-md hover:bg-surface-container transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            Export CSV
+            {isExporting && <ButtonLoader />}
+            {isExporting ? 'Exporting...' : 'Export CSV'}
           </button>
           <button 
             onClick={handleRunAll}
-            className="flex-1 sm:flex-none px-4 py-2 bg-primary text-on-primary rounded font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm flex items-center justify-center gap-2"
+            disabled={isRunningAll}
+            className="flex-1 sm:flex-none px-4 py-2 bg-primary text-on-primary rounded font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-[18px]">play_arrow</span>
-            Run Batch Agent
+            {isRunningAll ? <ButtonLoader /> : <span className="material-symbols-outlined text-[18px]">play_arrow</span>}
+            {isRunningAll ? 'Running...' : 'Run Batch Agent'}
           </button>
         </div>
       </div>
@@ -256,9 +275,11 @@ export default function FailedMandates() {
           </span>
           <button 
             onClick={handleBulkAction}
-            className="px-4 py-1.5 bg-primary text-on-primary rounded text-xs font-bold hover:bg-primary-container transition-colors shadow-sm"
+            disabled={isBulkRunning}
+            className="px-4 py-1.5 bg-primary text-on-primary rounded text-xs font-bold hover:bg-primary-container transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50"
           >
-            Bulk Run AI Agent
+            {isBulkRunning && <ButtonLoader className="h-3 w-3" />}
+            {isBulkRunning ? 'Running...' : 'Bulk Run AI Agent'}
           </button>
         </div>
       )}
@@ -351,10 +372,11 @@ export default function FailedMandates() {
                         </button>
                         <button 
                           onClick={() => triggerAIAgent(item.id)}
-                          className="p-1.5 text-primary hover:bg-primary-fixed rounded transition-colors flex items-center" 
+                          disabled={runningMandateId === item.id}
+                          className="p-1.5 text-primary hover:bg-primary-fixed rounded transition-colors flex items-center disabled:opacity-50" 
                           title="Run AI Agent"
                         >
-                          <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                          {runningMandateId === item.id ? <ButtonLoader className="h-[18px] w-[18px]" /> : <span className="material-symbols-outlined text-[18px]">auto_awesome</span>}
                         </button>
                       </div>
                     </td>
@@ -448,14 +470,15 @@ export default function FailedMandates() {
                 Close
               </button>
               <button 
-                onClick={() => {
-                  triggerAIAgent(detailModalItem.id);
+                onClick={async () => {
+                  await triggerAIAgent(detailModalItem.id);
                   setDetailModalItem(null);
                 }}
-                className="px-4 py-2 bg-primary text-on-primary rounded font-label-md text-label-md hover:bg-primary-container transition-colors flex items-center gap-1"
+                disabled={runningMandateId === detailModalItem.id}
+                className="px-4 py-2 bg-primary text-on-primary rounded font-label-md text-label-md hover:bg-primary-container transition-colors flex items-center gap-1 disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                Run AI Agent
+                {runningMandateId === detailModalItem.id ? <ButtonLoader /> : <span className="material-symbols-outlined text-[16px]">auto_awesome</span>}
+                {runningMandateId === detailModalItem.id ? 'Running...' : 'Run AI Agent'}
               </button>
             </div>
           </div>

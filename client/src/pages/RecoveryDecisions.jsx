@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton';
+import { ButtonLoader, SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton';
 import { confirmDecision, fetchDecisions, overrideDecision, processDecisionBatch } from '../services/api';
 
 export default function RecoveryDecisions() {
@@ -9,6 +9,9 @@ export default function RecoveryDecisions() {
   const [decisionFilter, setDecisionFilter] = useState('ALL');
   const [toast, setToast] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const [confirmingId, setConfirmingId] = useState('');
+  const [overridingId, setOverridingId] = useState('');
 
   const displayAction = (action) => action === 'CANCEL_MANDATE' ? 'CANCEL' : action;
 
@@ -59,11 +62,14 @@ export default function RecoveryDecisions() {
   };
 
   const handleConfirmPlan = async (id) => {
+    setConfirmingId(id);
     try {
       await confirmDecision(id);
       showToast(`AI plan confirmed for ${id}.`);
     } catch {
       showToast(`Could not confirm AI plan for ${id}.`);
+    } finally {
+      setConfirmingId('');
     }
   };
 
@@ -73,6 +79,7 @@ export default function RecoveryDecisions() {
     if (newDecision && ['RETRY', 'CANCEL', 'ESCALATE', 'NOTIFY_CUSTOMER'].includes(newDecision.toUpperCase())) {
       const upper = newDecision.toUpperCase();
       const current = decisions.find((d) => d.id === id);
+      setOverridingId(id);
       try {
         const saved = await overrideDecision(id, {
           action: backendAction(upper),
@@ -86,7 +93,21 @@ export default function RecoveryDecisions() {
         showToast(`Decision updated to ${upper} for ${id}`);
       } catch {
         showToast(`Backend override failed for ${id}`);
+      } finally {
+        setOverridingId('');
       }
+    }
+  };
+
+  const handleProcessBatch = async () => {
+    setIsProcessingBatch(true);
+    try {
+      const results = await processDecisionBatch(filteredDecisions.map((item) => item.id));
+      showToast(`Batch processed ${results.length} selected decisions.`);
+    } catch {
+      showToast('Backend batch processing failed.');
+    } finally {
+      setIsProcessingBatch(false);
     }
   };
 
@@ -127,17 +148,12 @@ export default function RecoveryDecisions() {
           </div>
 
           <button 
-            onClick={async () => {
-              try {
-                const results = await processDecisionBatch(filteredDecisions.map((item) => item.id));
-                showToast(`Batch processed ${results.length} selected decisions.`);
-              } catch {
-                showToast('Backend batch processing failed.');
-              }
-            }}
-            className="px-4 py-2 bg-primary rounded-lg font-label-md text-label-md text-on-primary hover:bg-on-primary-fixed-variant transition-colors shadow-sm whitespace-nowrap"
+            onClick={handleProcessBatch}
+            disabled={isProcessingBatch || filteredDecisions.length === 0}
+            className="px-4 py-2 bg-primary rounded-lg font-label-md text-label-md text-on-primary hover:bg-on-primary-fixed-variant transition-colors shadow-sm whitespace-nowrap flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            Process Batch ({filteredDecisions.length})
+            {isProcessingBatch && <ButtonLoader />}
+            {isProcessingBatch ? 'Processing...' : `Process Batch (${filteredDecisions.length})`}
           </button>
         </div>
       </div>
@@ -310,15 +326,19 @@ export default function RecoveryDecisions() {
               <div className="mt-auto pt-4 flex gap-2">
                 <button 
                   onClick={() => handleOverride(activeItem.id)}
-                  className="flex-1 py-2 bg-surface hover:bg-surface-container border border-outline-variant/50 rounded-lg font-title-md text-body-md text-on-surface transition-colors"
+                  disabled={overridingId === activeItem.id}
+                  className="flex-1 py-2 bg-surface hover:bg-surface-container border border-outline-variant/50 rounded-lg font-title-md text-body-md text-on-surface transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  Override
+                  {overridingId === activeItem.id && <ButtonLoader />}
+                  {overridingId === activeItem.id ? 'Saving...' : 'Override'}
                 </button>
                 <button 
                   onClick={() => handleConfirmPlan(activeItem.id)}
-                  className="flex-1 py-2 bg-primary hover:bg-on-primary-fixed-variant rounded-lg font-title-md text-body-md text-on-primary shadow-sm transition-colors"
+                  disabled={confirmingId === activeItem.id}
+                  className="flex-1 py-2 bg-primary hover:bg-on-primary-fixed-variant rounded-lg font-title-md text-body-md text-on-primary shadow-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  Confirm AI Plan
+                  {confirmingId === activeItem.id && <ButtonLoader />}
+                  {confirmingId === activeItem.id ? 'Confirming...' : 'Confirm AI Plan'}
                 </button>
               </div>
             </div>

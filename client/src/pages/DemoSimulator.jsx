@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ButtonLoader } from '../components/LoadingSkeleton';
 import { simulateRecovery } from '../services/api';
 
 export default function DemoSimulator() {
@@ -161,7 +162,7 @@ export default function DemoSimulator() {
                 className="w-full mt-6 bg-primary text-on-primary font-title-md text-title-md py-3 rounded-lg hover:bg-on-primary-fixed-variant transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50" 
                 type="button"
               >
-                <span className="material-symbols-outlined">{isRunning ? 'sync' : 'play_arrow'}</span>
+                {isRunning ? <ButtonLoader /> : <span className="material-symbols-outlined">play_arrow</span>}
                 {isRunning ? 'Simulating...' : 'Simulate Recovery'}
               </button>
             </div>

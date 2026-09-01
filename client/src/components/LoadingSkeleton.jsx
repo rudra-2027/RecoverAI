@@ -58,3 +58,12 @@ export function SummaryCardSkeleton({ lines = 3 }) {
     </div>
   );
 }
+
+export function ButtonLoader({ className = '' }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-block h-4 w-4 shrink-0 rounded-full border-2 border-current border-r-transparent animate-spin ${className}`}
+    />
+  );
+}

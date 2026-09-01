@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { SkeletonBlock } from '../components/LoadingSkeleton';
+import { ButtonLoader, SkeletonBlock } from '../components/LoadingSkeleton';
 import { downloadAuditCsv, fetchAuditLogs, fetchFailedMandates } from '../services/api';
 
 export default function AuditTrail() {
@@ -11,6 +11,7 @@ export default function AuditTrail() {
   const [backendLogs, setBackendLogs] = useState([]);
   const [isLoadingMandates, setIsLoadingMandates] = useState(true);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const normalizeLog = (log) => ({
     id: String(log.id),
@@ -65,11 +66,15 @@ export default function AuditTrail() {
   };
 
   const triggerExport = async () => {
+    if (!selectedMandate) return;
+    setIsExporting(true);
     try {
       await downloadAuditCsv(selectedMandate);
       setToast(`Audit log downloaded for ${selectedMandate}.`);
     } catch {
       setToast(`Could not export audit log for ${selectedMandate}.`);
+    } finally {
+      setIsExporting(false);
     }
     setTimeout(() => setToast(''), 3000);
   };
@@ -119,10 +124,11 @@ export default function AuditTrail() {
             
             <button 
               onClick={triggerExport}
-              className="px-4 py-2 bg-surface border border-outline-variant text-on-surface hover:bg-surface-container-highest font-label-md text-label-md rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm whitespace-nowrap"
+              disabled={isExporting || !selectedMandate}
+              className="px-4 py-2 bg-surface border border-outline-variant text-on-surface hover:bg-surface-container-highest font-label-md text-label-md rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm whitespace-nowrap disabled:opacity-50"
             >
-              <span className="material-symbols-outlined text-sm">download</span>
-              Export Log
+              {isExporting ? <ButtonLoader /> : <span className="material-symbols-outlined text-sm">download</span>}
+              {isExporting ? 'Exporting...' : 'Export Log'}
             </button>
           </div>
         </div>

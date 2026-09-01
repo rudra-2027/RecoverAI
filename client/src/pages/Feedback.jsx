@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ButtonLoader } from '../components/LoadingSkeleton';
 import { createFeedback, fetchFeedback } from '../services/api';
 
 const initialForm = {
@@ -177,7 +178,7 @@ export default function Feedback() {
 
             <div className="flex justify-end pt-2">
               <button type="submit" disabled={isSubmitting} className="bg-primary text-on-primary font-title-md text-title-md px-6 py-3 rounded-lg hover:bg-on-primary-fixed-variant transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50">
-                <span className="material-symbols-outlined">{isSubmitting ? 'sync' : 'send'}</span>
+                {isSubmitting ? <ButtonLoader /> : <span className="material-symbols-outlined">send</span>}
                 {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
               </button>
             </div>

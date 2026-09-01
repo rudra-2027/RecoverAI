@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { SkeletonBlock } from '../components/LoadingSkeleton';
+import { ButtonLoader, SkeletonBlock } from '../components/LoadingSkeleton';
 import {
   fetchMerchants,
   fetchRecoverySettings,
@@ -25,13 +25,17 @@ export default function Settings() {
   const [keyHidden, setKeyHidden] = useState(true);
   const [systemStatus, setSystemStatus] = useState(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
+  const [isRegeneratingKey, setIsRegeneratingKey] = useState(false);
+  const [togglingMerchantId, setTogglingMerchantId] = useState('');
 
   // Toast
   const [toast, setToast] = useState('');
 
   const loadSettings = () => {
     setIsLoadingSettings(true);
-    Promise.allSettled([fetchMerchants(), fetchRecoverySettings(), fetchSystemStatus()])
+    return Promise.allSettled([fetchMerchants(), fetchRecoverySettings(), fetchSystemStatus()])
       .then(([merchantResult, settingsResult, statusResult]) => {
         if (merchantResult.status === 'fulfilled') {
           const data = merchantResult.value;
@@ -65,6 +69,7 @@ export default function Settings() {
   };
 
   const handleSave = async () => {
+    setIsSaving(true);
     try {
       await updateRecoverySettings({
         maxRetries,
@@ -73,30 +78,52 @@ export default function Settings() {
       showToast('Recovery configuration saved.');
     } catch {
       showToast('Could not save recovery configuration.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleDiscard = () => {
-    loadSettings();
+  const handleDiscard = async () => {
+    setIsDiscarding(true);
+    await loadSettings();
+    setIsDiscarding(false);
     showToast('Changes discarded.');
   };
 
   const toggleMerchant = async (id) => {
     const merchant = merchants.find((m) => m.id === id);
     const enabled = !merchant?.enabled;
-    setMerchants(merchants.map(m => m.id === id ? { ...m, enabled } : m));
+    const previousMerchants = merchants;
+    setTogglingMerchantId(id);
+    setMerchants(previousMerchants.map(m => m.id === id ? { ...m, enabled } : m));
     try {
       await updateMerchantSettings(id, { active: enabled });
       showToast(`Merchant ${enabled ? 'enabled' : 'disabled'}.`);
     } catch {
-      setMerchants(merchants);
+      setMerchants(previousMerchants);
       showToast('Could not update merchant setting.');
+    } finally {
+      setTogglingMerchantId('');
     }
   };
 
   const copyApiKey = () => {
     navigator.clipboard.writeText(apiKey);
     showToast('API Key copied to clipboard!');
+  };
+
+  const handleRegenerateApiKey = async () => {
+    setIsRegeneratingKey(true);
+    try {
+      const result = await regenerateApiKey();
+      setApiKey(result.apiKey);
+      setKeyHidden(false);
+      showToast(result.message || 'API key regenerated.');
+    } catch {
+      showToast('Could not regenerate API key.');
+    } finally {
+      setIsRegeneratingKey(false);
+    }
   };
 
   return (
@@ -270,13 +297,18 @@ export default function Settings() {
                       </div>
                       <button 
                         onClick={() => toggleMerchant(merchant.id)}
+                        disabled={togglingMerchantId === merchant.id}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
                           merchant.enabled ? 'bg-primary' : 'bg-outline'
-                        }`}
+                        } disabled:opacity-50`}
                       >
-                        <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                          merchant.enabled ? 'translate-x-6' : 'translate-x-1'
-                        }`}></span>
+                        {togglingMerchantId === merchant.id ? (
+                          <ButtonLoader className="h-4 w-4 mx-auto text-white" />
+                        ) : (
+                          <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                            merchant.enabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}></span>
+                        )}
                       </button>
                     </div>
                     ))
@@ -317,18 +349,12 @@ export default function Settings() {
                     </button>
                   </div>
                   <button 
-                    onClick={() => {
-                      regenerateApiKey()
-                        .then((result) => {
-                          setApiKey(result.apiKey);
-                          setKeyHidden(false);
-                          showToast(result.message || 'API key regenerated.');
-                        })
-                        .catch(() => showToast('Could not regenerate API key.'));
-                    }}
-                    className="font-label-md text-label-md text-error bg-error-container/20 border border-error-container hover:bg-error-container/30 px-4 py-2 rounded-lg transition-colors font-bold"
+                    onClick={handleRegenerateApiKey}
+                    disabled={isRegeneratingKey}
+                    className="font-label-md text-label-md text-error bg-error-container/20 border border-error-container hover:bg-error-container/30 px-4 py-2 rounded-lg transition-colors font-bold flex items-center gap-2 disabled:opacity-50"
                   >
-                    Regenerate Secret Key
+                    {isRegeneratingKey && <ButtonLoader />}
+                    {isRegeneratingKey ? 'Regenerating...' : 'Regenerate Secret Key'}
                   </button>
                 </div>
               </div>
@@ -393,15 +419,19 @@ export default function Settings() {
             <div className="flex justify-end gap-4 pt-4 border-t border-outline-variant/30">
               <button 
                 onClick={handleDiscard}
-                className="px-6 py-2 rounded-lg font-title-md text-title-md text-on-surface-variant border border-outline-variant hover:bg-surface-container-high transition-colors bg-white shadow-sm"
+                disabled={isDiscarding}
+                className="px-6 py-2 rounded-lg font-title-md text-title-md text-on-surface-variant border border-outline-variant hover:bg-surface-container-high transition-colors bg-white shadow-sm flex items-center gap-2 disabled:opacity-50"
               >
-                Discard Changes
+                {isDiscarding && <ButtonLoader />}
+                {isDiscarding ? 'Discarding...' : 'Discard Changes'}
               </button>
               <button 
                 onClick={handleSave}
-                className="px-6 py-2 rounded-lg font-title-md text-title-md bg-primary text-white hover:bg-primary/95 shadow-sm transition-colors font-semibold"
+                disabled={isSaving}
+                className="px-6 py-2 rounded-lg font-title-md text-title-md bg-primary text-white hover:bg-primary/95 shadow-sm transition-colors font-semibold flex items-center gap-2 disabled:opacity-50"
               >
-                Save Configuration
+                {isSaving && <ButtonLoader />}
+                {isSaving ? 'Saving...' : 'Save Configuration'}
               </button>
             </div>
 

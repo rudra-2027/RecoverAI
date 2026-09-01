@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { MetricCardSkeleton, SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton';
+import { ButtonLoader, MetricCardSkeleton, SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton';
 import { downloadBatchReport, fetchBatches, runAllAgents, uploadBatch } from '../services/api';
 
 export default function BatchProcessing() {
@@ -12,6 +12,8 @@ export default function BatchProcessing() {
   const [uploadStep, setUploadStep] = useState('idle'); // idle, uploading, processing, done
   const [toast, setToast] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isRunningAll, setIsRunningAll] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const percentChange = (current, previous) => {
     if (!previous && !current) return 0;
@@ -150,12 +152,15 @@ export default function BatchProcessing() {
   };
 
   const handleRunAll = async () => {
+    setIsRunningAll(true);
     try {
       const result = await runAllAgents();
       showToast(`Backend batch finished: ${result.successfulRecoveries}/${result.totalProcessed} recovered.`);
       loadBatches();
     } catch {
       showToast('Backend batch could not run.');
+    } finally {
+      setIsRunningAll(false);
     }
   };
 
@@ -166,11 +171,14 @@ export default function BatchProcessing() {
       return;
     }
 
+    setIsExporting(true);
     try {
       await downloadBatchReport(id);
       showToast(`Batch ${activeBatch.id} report downloaded.`);
     } catch {
       showToast(`Could not export report for ${activeBatch.id}.`);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -233,15 +241,19 @@ export default function BatchProcessing() {
         <div className="flex gap-3 w-full sm:w-auto">
           <button 
             onClick={handleExportReport}
-            className="flex-1 sm:flex-none px-4 py-2 border border-outline-variant text-on-surface rounded-md font-title-md text-title-md hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2"
+            disabled={isExporting || !activeBatch}
+            className="flex-1 sm:flex-none px-4 py-2 border border-outline-variant text-on-surface rounded-md font-title-md text-title-md hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-[18px]">download</span> Export Report
+            {isExporting ? <ButtonLoader /> : <span className="material-symbols-outlined text-[18px]">download</span>}
+            {isExporting ? 'Exporting...' : 'Export Report'}
           </button>
           <button 
             onClick={handleRunAll}
-            className="flex-1 sm:flex-none px-4 py-2 border border-outline-variant text-on-surface rounded-md font-title-md text-title-md hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2"
+            disabled={isRunningAll}
+            className="flex-1 sm:flex-none px-4 py-2 border border-outline-variant text-on-surface rounded-md font-title-md text-title-md hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-[18px]">play_arrow</span> Run All
+            {isRunningAll ? <ButtonLoader /> : <span className="material-symbols-outlined text-[18px]">play_arrow</span>}
+            {isRunningAll ? 'Running...' : 'Run All'}
           </button>
           <button 
             onClick={() => setIsModalOpen(true)}
@@ -545,8 +557,9 @@ export default function BatchProcessing() {
                 <button 
                   disabled={!uploadFile}
                   onClick={startUploadSimulation}
-                  className="px-4 py-2 bg-primary text-on-primary rounded font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm disabled:opacity-50"
+                  className="px-4 py-2 bg-primary text-on-primary rounded font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
                 >
+                  <span className="material-symbols-outlined text-[16px]">upload_file</span>
                   Upload &amp; Analyze
                 </button>
               )}
