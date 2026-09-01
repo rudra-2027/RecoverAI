@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { ButtonLoader, MetricCardSkeleton, SkeletonBlock, TableSkeletonRows } from '../components/LoadingSkeleton';
-import { downloadBatchReport, fetchBatches, runAllAgents, uploadBatch } from '../services/api';
+import { downloadBatchReport, fetchBatch, fetchBatches, runAllAgents, runBatch, uploadBatch } from '../services/api';
 
 export default function BatchProcessing() {
   const [batches, setBatches] = useState([]);
@@ -9,7 +9,8 @@ export default function BatchProcessing() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStep, setUploadStep] = useState('idle'); // idle, uploading, processing, done
+  const [uploadStep, setUploadStep] = useState('idle'); // idle, uploading, processing, done, failed
+  const [uploadMonitor, setUploadMonitor] = useState(null);
   const [toast, setToast] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isRunningAll, setIsRunningAll] = useState(false);
@@ -27,6 +28,10 @@ export default function BatchProcessing() {
     const failed = item.failedRecoveries || 0;
     const percentNum = total > 0 ? (recovered * 100) / total : 0;
     const revenueNum = Number(item.recoveredRevenue || 0);
+    const rawStatus = String(item.status || '').toUpperCase();
+    const isFailed = rawStatus === 'FAILED';
+    const isCompleted = rawStatus === 'COMPLETED' || (!rawStatus && item.completedAt);
+    const status = isFailed ? 'Failed' : isCompleted ? 'Completed' : 'Processing';
 
     return {
       id: `BAT-${item.id}`,
@@ -40,10 +45,10 @@ export default function BatchProcessing() {
       revenue: revenueNum > 0 ? `$${revenueNum.toLocaleString()}` : '--',
       revenueNum,
       avgTicket: recovered > 0 ? `$${(revenueNum / recovered).toFixed(2)}` : '--',
-      time: item.completedAt ? 'Completed' : 'In Progress',
-      status: item.completedAt ? 'Completed' : 'Processing',
-      statusClass: item.completedAt ? 'text-primary bg-primary-container/20' : 'text-secondary bg-secondary-container/50',
-      dotClass: item.completedAt ? 'bg-primary' : 'bg-secondary animate-pulse',
+      time: item.completedAt ? status : 'In Progress',
+      status,
+      statusClass: isFailed ? 'text-error bg-error-container/40' : isCompleted ? 'text-primary bg-primary-container/20' : 'text-secondary bg-secondary-container/50',
+      dotClass: isFailed ? 'bg-error' : isCompleted ? 'bg-primary' : 'bg-secondary animate-pulse',
       aiSummary: `Backend batch processed ${total} mandates with ${recovered} successful recoveries and ${failed} failed recoveries.`,
     };
   };
@@ -68,6 +73,44 @@ export default function BatchProcessing() {
   const backendBatchId = (id) => {
     const value = String(id || '').replace(/^BAT-/, '');
     return /^\d+$/.test(value) ? value : null;
+  };
+
+  const formatBatchStatus = (status, processed, totalRecords) => {
+    const normalized = String(status || '').toUpperCase();
+    if (normalized === 'FAILED') return 'Failed';
+    if (totalRecords > 0 && processed >= totalRecords) return 'Completed';
+    if (normalized === 'COMPLETED') return 'Completed';
+    if (normalized === 'RUNNING' || normalized === 'PROCESSING') return 'Processing';
+    return 'Uploading';
+  };
+
+  const batchMonitorFromBatch = (batch, fallbackStatus = 'Processing') => {
+    const totalRecords = Number(batch?.totalMandates || 0);
+    const successful = Number(batch?.successfulRecoveries || 0);
+    const failed = Number(batch?.failedRecoveries || 0);
+    const processed = Math.min(successful + failed, totalRecords || successful + failed);
+    const status = formatBatchStatus(batch?.status || fallbackStatus, processed, totalRecords);
+
+    return {
+      batchId: batch?.id || '',
+      status,
+      totalRecords,
+      processed,
+      successful,
+      failed,
+    };
+  };
+
+  const progressPercent = (monitor) => {
+    if (!monitor?.totalRecords) return 0;
+    return Math.min(100, (monitor.processed / monitor.totalRecords) * 100);
+  };
+
+  const statusBadgeClass = (status) => {
+    if (status === 'Completed') return 'text-primary bg-primary-container/15 border-primary/20';
+    if (status === 'Failed') return 'text-error bg-error-container/40 border-error/20';
+    if (status === 'Processing') return 'text-secondary bg-secondary-container/50 border-secondary/20';
+    return 'text-on-surface-variant bg-surface-container border-outline-variant/50';
   };
 
   useEffect(() => {
@@ -146,6 +189,65 @@ export default function BatchProcessing() {
     );
   };
 
+  const BatchProgressCard = ({ monitor }) => {
+    const percent = progressPercent(monitor);
+    const percentText = `${percent.toFixed(1)}%`;
+    const isActive = monitor.status === 'Uploading' || monitor.status === 'Processing';
+    const isFailed = monitor.status === 'Failed';
+
+    const rows = [
+      { label: 'Records', value: monitor.totalRecords ? monitor.totalRecords.toLocaleString() : '--', tone: 'text-on-surface' },
+      {
+        label: 'Processed',
+        value: `${monitor.processed.toLocaleString()} / ${monitor.totalRecords ? monitor.totalRecords.toLocaleString() : '--'}`,
+        tone: 'text-on-surface',
+      },
+      { label: 'Successful', value: monitor.successful.toLocaleString(), tone: 'text-primary' },
+      { label: 'Failed', value: monitor.failed.toLocaleString(), tone: 'text-error' },
+    ];
+
+    return (
+      <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/40 shadow-level1 p-5 space-y-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="font-title-lg text-title-lg text-on-surface">
+              {monitor.batchId ? `Batch #${monitor.batchId}` : 'Batch #--'}
+            </p>
+            <div className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-label-md text-label-md ${statusBadgeClass(monitor.status)}`}>
+              {isActive && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>}
+              <span>{monitor.status}</span>
+              {monitor.status === 'Completed' && <span className="material-symbols-outlined fill text-[16px]">check_circle</span>}
+              {isFailed && <span className="material-symbols-outlined fill text-[16px]">error</span>}
+            </div>
+          </div>
+          {isActive && <ButtonLoader className="mt-1" />}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {rows.map((row) => (
+            <div key={row.label} className="rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5">
+              <div className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">{row.label}</div>
+              <div className={`mt-1 font-title-md text-title-md font-bold ${row.tone}`}>{row.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-center justify-between font-body-sm text-body-sm">
+            <span className="text-on-surface-variant">Progress</span>
+            <span className={`font-code text-code font-bold ${isFailed ? 'text-error' : 'text-primary'}`}>{percentText}</span>
+          </div>
+          <div className="h-3 w-full overflow-hidden rounded-full bg-surface-container border border-outline-variant/40">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${isFailed ? 'bg-error' : 'bg-primary'}`}
+              style={{ width: percentText }}
+            ></div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
@@ -197,20 +299,99 @@ export default function BatchProcessing() {
 
   const startUploadSimulation = async () => {
     if (!uploadFile) return;
+    let poller;
+    let activeUploadBatchId = '';
     setUploadStep('uploading');
     setUploadProgress(0);
+    setUploadMonitor({
+      batchId: '',
+      status: 'Uploading',
+      totalRecords: 0,
+      processed: 0,
+      successful: 0,
+      failed: 0,
+    });
 
     try {
-      setUploadProgress(35);
-      const result = await uploadBatch(uploadFile, true);
+      const uploadResult = await uploadBatch(uploadFile, false, {
+        onUploadProgress: (progressEvent) => {
+          if (!progressEvent.total) return;
+          setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+        },
+      });
+      activeUploadBatchId = uploadResult.batchRunId;
       setUploadProgress(100);
+      setUploadMonitor({
+        batchId: uploadResult.batchRunId,
+        status: 'Processing',
+        totalRecords: Number(uploadResult.importedMandates || 0),
+        processed: 0,
+        successful: 0,
+        failed: 0,
+      });
       setUploadStep('processing');
-      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      const pollBatch = async () => {
+        const batch = await fetchBatch(uploadResult.batchRunId);
+        const nextMonitor = batchMonitorFromBatch(batch);
+        setUploadMonitor(nextMonitor);
+
+        if (nextMonitor.status === 'Completed' || nextMonitor.status === 'Failed') {
+          window.clearInterval(poller);
+          setUploadStep(nextMonitor.status === 'Completed' ? 'done' : 'failed');
+          loadBatches();
+        }
+      };
+
+      poller = window.setInterval(() => {
+        pollBatch().catch(() => {
+          window.clearInterval(poller);
+        });
+      }, 800);
+
+      const processingResult = await runBatch(uploadResult.batchRunId);
+      window.clearInterval(poller);
+      setUploadMonitor({
+        batchId: processingResult.batchRunId,
+        status: processingResult.status === 'FAILED' ? 'Failed' : 'Completed',
+        totalRecords: Number(processingResult.totalProcessed || uploadResult.importedMandates || 0),
+        processed: Number(processingResult.totalProcessed || 0),
+        successful: Number(processingResult.successfulRecoveries || 0),
+        failed: Number(processingResult.failedRecoveries || 0),
+      });
       setUploadStep('done');
-      showToast(`Imported ${result.importedMandates} mandates from ${result.fileName}.`);
+      showToast(`Imported ${uploadResult.importedMandates} mandates from ${uploadResult.fileName}.`);
       loadBatches();
     } catch {
-      setUploadStep('idle');
+      if (poller) {
+        window.clearInterval(poller);
+      }
+      const currentBatchId = activeUploadBatchId || uploadMonitor?.batchId;
+      if (currentBatchId) {
+        try {
+          const failedBatch = await fetchBatch(currentBatchId);
+          setUploadMonitor(batchMonitorFromBatch(failedBatch, 'Failed'));
+        } catch {
+          setUploadMonitor((current) => ({
+            batchId: current?.batchId || '',
+            status: 'Failed',
+            totalRecords: current?.totalRecords || 0,
+            processed: current?.processed || 0,
+            successful: current?.successful || 0,
+            failed: current?.failed || 0,
+          }));
+        }
+      } else {
+        setUploadMonitor((current) => ({
+          batchId: current?.batchId || '',
+          status: 'Failed',
+          totalRecords: current?.totalRecords || 0,
+          processed: current?.processed || 0,
+          successful: current?.successful || 0,
+          failed: current?.failed || 0,
+        }));
+      }
+      setUploadStep('failed');
       showToast('Batch upload failed.');
     }
   };
@@ -220,6 +401,7 @@ export default function BatchProcessing() {
     setUploadFile(null);
     setUploadProgress(0);
     setUploadStep('idle');
+    setUploadMonitor(null);
   };
 
   return (
@@ -510,38 +692,21 @@ export default function BatchProcessing() {
                 </div>
               )}
 
-              {uploadStep === 'uploading' && (
+              {uploadStep !== 'idle' && uploadMonitor && (
                 <div className="space-y-4">
-                  <div className="flex justify-between text-body-sm font-semibold">
-                    <span>Uploading CSV file...</span>
-                    <span>{uploadProgress}%</span>
-                  </div>
-                  <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden">
-                    <div className="h-full bg-primary transition-all duration-150" style={{ width: `${uploadProgress}%` }}></div>
-                  </div>
-                </div>
-              )}
+                  <BatchProgressCard monitor={uploadMonitor} />
 
-              {uploadStep === 'processing' && (
-                <div className="space-y-4 text-center py-4">
-                  <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto mb-4"></div>
-                  <h4 className="font-title-md text-[#8a2be2] font-bold flex items-center justify-center gap-1">
-                    <span className="material-symbols-outlined text-[18px] fill animate-pulse">auto_awesome</span>
-                    AI Model Synthesizing
-                  </h4>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
-                    Analyzing accounts, validating bank codes, and predicting optimal retry timing...
-                  </p>
-                </div>
-              )}
-
-              {uploadStep === 'done' && (
-                <div className="text-center py-6 space-y-3">
-                  <span className="material-symbols-outlined text-5xl text-green-500 fill mb-2">check_circle</span>
-                  <h4 className="font-title-lg text-title-lg text-on-surface font-bold">Successfully Registered!</h4>
-                  <p className="text-body-sm text-on-surface-variant">
-                    Your batch upload is complete. The mandate queues are executing automatically.
-                  </p>
+                  {uploadStep === 'uploading' && (
+                    <div className="rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
+                      <div className="mb-2 flex justify-between font-body-sm text-body-sm">
+                        <span className="text-on-surface-variant">File transfer</span>
+                        <span className="font-code text-code font-bold text-primary">{uploadProgress}%</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-container">
+                        <div className="h-full rounded-full bg-primary transition-all duration-150" style={{ width: `${uploadProgress}%` }}></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

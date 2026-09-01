@@ -150,18 +150,40 @@ public class BatchFileServiceImpl implements BatchFileService {
         BigDecimal recoveredRevenue = BigDecimal.ZERO;
 
         batchRun.setStatus("RUNNING");
+        batchRun.setCompletedAt(null);
+        batchRun.setSuccessfulRecoveries(0);
+        batchRun.setFailedRecoveries(0);
+        batchRun.setRecoveredRevenue(BigDecimal.ZERO);
         batchRunRepository.save(batchRun);
 
-        for (FailedMandate mandate : mandates) {
-            RecoveryResult result = revenueRecoveryAgent.run(mandate);
-            log.debug("Batch run id={} processed mandateId={} with outcome={}",
-                    batchRunId, mandate.getMandateId(), result.outcome());
-            if ("SUCCESS".equals(result.outcome())) {
-                successes++;
-                recoveredRevenue = recoveredRevenue.add(mandate.getAmount());
-            } else {
-                failures++;
+        try {
+            for (FailedMandate mandate : mandates) {
+                RecoveryResult result = revenueRecoveryAgent.run(mandate);
+                log.debug("Batch run id={} processed mandateId={} with outcome={}",
+                        batchRunId, mandate.getMandateId(), result.outcome());
+                if ("SUCCESS".equals(result.outcome())) {
+                    successes++;
+                    recoveredRevenue = recoveredRevenue.add(mandate.getAmount());
+                } else {
+                    failures++;
+                }
+
+                batchRun.setSuccessfulRecoveries(successes);
+                batchRun.setFailedRecoveries(failures);
+                batchRun.setRecoveredRevenue(recoveredRevenue);
+                batchRunRepository.save(batchRun);
             }
+        } catch (RuntimeException ex) {
+            log.error("Batch processing failed for batchRunId={} after processed={}",
+                    batchRunId, successes + failures, ex);
+            batchRun.setCompletedAt(LocalDateTime.now());
+            batchRun.setSuccessfulRecoveries(successes);
+            batchRun.setFailedRecoveries(failures);
+            batchRun.setRecoveredRevenue(recoveredRevenue);
+            batchRun.setStatus("FAILED");
+            batchRun.setErrorMessage(ex.getMessage());
+            batchRunRepository.save(batchRun);
+            throw ex;
         }
 
         batchRun.setCompletedAt(LocalDateTime.now());

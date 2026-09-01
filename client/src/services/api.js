@@ -20,14 +20,15 @@ export const createFailedMandate = (payload) => api.post('/ingest/failed-mandate
 export const fetchDecisions = () => api.get('/decisions').then((res) => res.data);
 export const fetchAuditLogs = (mandateId) => api.get(`/audit/${mandateId}`).then((res) => res.data);
 export const fetchBatches = () => api.get('/batches').then((res) => res.data);
+export const fetchBatch = (batchId) => api.get(`/batches/${batchId}`).then((res) => res.data);
 export const fetchOutcomes = () => api.get('/outcomes').then((res) => res.data);
 export const runAgent = (mandateId) => api.post(`/agent/run/${mandateId}`).then((res) => res.data);
 export const runAllAgents = () => api.post('/agent/run-all').then((res) => res.data);
-export const uploadBatch = (file, process = false) => {
+export const uploadBatch = (file, process = false, config = {}) => {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('process', String(process));
-  return api.post('/batches/upload', formData).then((res) => res.data);
+  return api.post('/batches/upload', formData, config).then((res) => res.data);
 };
 export const runBatch = (batchId) => api.post(`/batches/${batchId}/run`).then((res) => res.data);
 export const processDecisionBatch = (mandateIds) => api.post('/decisions/process-batch', { mandateIds }).then((res) => res.data);
