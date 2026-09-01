@@ -51,57 +51,66 @@ public class BatchFileServiceImpl implements BatchFileService {
         String fileName = Objects.requireNonNullElse(file.getOriginalFilename(), "uploaded-batch");
         String sourceType = sourceType(fileName);
         log.info("Uploading batch file name={}, sourceType={}, process={}", fileName, sourceType, process);
-        long start = System.currentTimeMillis();
-        BatchRun batchRun = batchRunRepository.save(BatchRun.builder()
-                .startedAt(LocalDateTime.now())
-                .sourceFileName(fileName)
-                .sourceType(sourceType)
-                .status(process ? "RUNNING" : "REGISTERED")
-                .totalMandates(0)
-                .successfulRecoveries(0)
-                .failedRecoveries(0)
-                .recoveredRevenue(BigDecimal.ZERO)
-                .build());
-        long afterBatchRun = System.currentTimeMillis();
+        long t0 = System.currentTimeMillis();
+
+        BatchRun batchRun = batchRunRepository.save(
+                BatchRun.builder()
+                        .startedAt(LocalDateTime.now())
+                        .sourceFileName(fileName)
+                        .sourceType(sourceType)
+                        .status(process ? "RUNNING" : "REGISTERED")
+                        .totalMandates(0)
+                        .successfulRecoveries(0)
+                        .failedRecoveries(0)
+                        .recoveredRevenue(BigDecimal.ZERO)
+                        .build()
+        );
+
+        long t1 = System.currentTimeMillis();
+
+        log.info("PERF batchRun.save = {} ms", t1 - t0);
 
         try {
             List<FailedMandate> mandates = parse(file, sourceType);
-            long afterParse = System.currentTimeMillis();
-            log.info(
-                    "TIMING batchRunSave={}ms parse={}ms",
-                    afterBatchRun - start,
-                    afterParse - afterBatchRun
-            );
+
+            long t2 = System.currentTimeMillis();
+
+            log.info("PERF parse = {} ms, count={}", t2 - t1, mandates.size());
             log.info("Parsed {} mandates from batchRunId={}, fileName={}", mandates.size(), batchRun.getId(), fileName);
             mandates.forEach(mandate -> {
                 mandate.setBatchRunId(batchRun.getId());
                 mandate.setCreatedAt(LocalDateTime.now());
+
                 if (mandate.getRetryCount() == null) {
                     mandate.setRetryCount(0);
                 }
+
                 if (mandate.getMaxRetries() == null) {
                     mandate.setMaxRetries(properties.maxRetries());
                 }
+
                 if (mandate.getStatus() == null) {
                     mandate.setStatus(PaymentStatus.FAILED);
                 }
             });
+
+            long t3 = System.currentTimeMillis();
+
+            log.info("PERF prepare entities = {} ms", t3 - t2);
+
             failedMandateRepository.saveAll(mandates);
-            long afterSave = System.currentTimeMillis();
-            log.info(
-                    "TIMING saveAll={}ms totalBeforeBatchRun={}ms",
-                    afterSave - afterParse,
-                    afterSave - start
-            );
+
+            long t4 = System.currentTimeMillis();
+
+            log.info("PERF saveAll = {} ms", t4 - t3);
 
             batchRun.setTotalMandates(mandates.size());
             batchRunRepository.save(batchRun);
-            long end = System.currentTimeMillis();
-            log.info(
-                    "TIMING batchRunUpdate={}ms TOTAL={}ms",
-                    end - afterSave,
-                    end - start
-            );
+
+            long t5 = System.currentTimeMillis();
+
+            log.info("PERF batchRun.update = {} ms", t5 - t4);
+            log.info("PERF TOTAL = {} ms", t5 - t0);
 
             BatchRunResult processingResult = process ? runBatch(batchRun.getId()) : null;
             log.info("Batch upload completed for batchRunId={}, process={}, totalMandates={}",
