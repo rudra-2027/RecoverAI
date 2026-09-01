@@ -51,6 +51,7 @@ public class BatchFileServiceImpl implements BatchFileService {
         String fileName = Objects.requireNonNullElse(file.getOriginalFilename(), "uploaded-batch");
         String sourceType = sourceType(fileName);
         log.info("Uploading batch file name={}, sourceType={}, process={}", fileName, sourceType, process);
+        long start = System.currentTimeMillis();
         BatchRun batchRun = batchRunRepository.save(BatchRun.builder()
                 .startedAt(LocalDateTime.now())
                 .sourceFileName(fileName)
@@ -61,9 +62,16 @@ public class BatchFileServiceImpl implements BatchFileService {
                 .failedRecoveries(0)
                 .recoveredRevenue(BigDecimal.ZERO)
                 .build());
+        long afterBatchRun = System.currentTimeMillis();
 
         try {
             List<FailedMandate> mandates = parse(file, sourceType);
+            long afterParse = System.currentTimeMillis();
+            log.info(
+                    "TIMING batchRunSave={}ms parse={}ms",
+                    afterBatchRun - start,
+                    afterParse - afterBatchRun
+            );
             log.info("Parsed {} mandates from batchRunId={}, fileName={}", mandates.size(), batchRun.getId(), fileName);
             mandates.forEach(mandate -> {
                 mandate.setBatchRunId(batchRun.getId());
@@ -79,9 +87,21 @@ public class BatchFileServiceImpl implements BatchFileService {
                 }
             });
             failedMandateRepository.saveAll(mandates);
+            long afterSave = System.currentTimeMillis();
+            log.info(
+                    "TIMING saveAll={}ms totalBeforeBatchRun={}ms",
+                    afterSave - afterParse,
+                    afterSave - start
+            );
 
             batchRun.setTotalMandates(mandates.size());
             batchRunRepository.save(batchRun);
+            long end = System.currentTimeMillis();
+            log.info(
+                    "TIMING batchRunUpdate={}ms TOTAL={}ms",
+                    end - afterSave,
+                    end - start
+            );
 
             BatchRunResult processingResult = process ? runBatch(batchRun.getId()) : null;
             log.info("Batch upload completed for batchRunId={}, process={}, totalMandates={}",
