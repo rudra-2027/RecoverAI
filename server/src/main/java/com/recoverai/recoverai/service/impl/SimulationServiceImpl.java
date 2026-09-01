@@ -10,6 +10,7 @@ import com.recoverai.recoverai.entity.FailedMandate;
 import com.recoverai.recoverai.entity.PaymentStatus;
 import com.recoverai.recoverai.entity.RecoveryOutcomeStatus;
 import com.recoverai.recoverai.repository.FailedMandateRepository;
+import com.recoverai.recoverai.service.MerchantRegistrationService;
 import com.recoverai.recoverai.service.SimulationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ public class SimulationServiceImpl
     private final RecoverAiProperties properties;
     private final FailedMandateRepository failedMandateRepository;
     private final RevenueRecoveryAgent revenueRecoveryAgent;
+    private final MerchantRegistrationService merchantRegistrationService;
 
     @Override
     public String simulate(
@@ -42,6 +44,7 @@ public class SimulationServiceImpl
 
     @Override
     public SimulatorRecoveryResponse recover(CreateFailedMandateRequest request) {
+        merchantRegistrationService.ensureMerchant(request.merchantId());
         FailedMandate mandate = FailedMandate.builder()
                 .merchantId(request.merchantId())
                 .customerId(request.customerId())

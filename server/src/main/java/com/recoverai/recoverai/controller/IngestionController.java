@@ -11,6 +11,7 @@ import com.recoverai.recoverai.entity.PaymentStatus;
 import com.recoverai.recoverai.repository.FailedMandateRepository;
 import com.recoverai.recoverai.repository.MerchantRepository;
 import com.recoverai.recoverai.repository.PaymentHistoryRepository;
+import com.recoverai.recoverai.service.MerchantRegistrationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class IngestionController {
     private final FailedMandateRepository failedMandateRepository;
     private final PaymentHistoryRepository paymentHistoryRepository;
     private final RecoverAiProperties properties;
+    private final MerchantRegistrationService merchantRegistrationService;
 
     @PostMapping("/merchants")
     @ResponseStatus(HttpStatus.CREATED)
@@ -54,6 +56,7 @@ public class IngestionController {
 
     @GetMapping("/merchants")
     public List<Merchant> merchants() {
+        merchantRegistrationService.syncKnownMerchants();
         return merchantRepository.findAll();
     }
 
@@ -61,6 +64,7 @@ public class IngestionController {
     @ResponseStatus(HttpStatus.CREATED)
     public FailedMandate createFailedMandate(@Valid @RequestBody CreateFailedMandateRequest request) {
         log.info("Creating failed mandate mandateId={}, merchantId={}", request.mandateId(), request.merchantId());
+        merchantRegistrationService.ensureMerchant(request.merchantId());
         FailedMandate mandate = FailedMandate.builder()
                 .merchantId(request.merchantId())
                 .customerId(request.customerId())
@@ -120,6 +124,7 @@ public class IngestionController {
     @ResponseStatus(HttpStatus.CREATED)
     public PaymentHistory createPaymentHistory(@Valid @RequestBody CreatePaymentHistoryRequest request) {
         log.info("Creating payment history mandateId={}, status={}", request.mandateId(), request.status());
+        merchantRegistrationService.ensureMerchant(request.merchantId());
         PaymentHistory history = PaymentHistory.builder()
                 .merchantId(request.merchantId())
                 .customerId(request.customerId())

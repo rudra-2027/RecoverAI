@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.recoverai.recoverai.entity.FailedMandate;
@@ -23,4 +24,7 @@ public interface FailedMandateRepository extends JpaRepository<FailedMandate, Lo
     List<FailedMandate> findByBatchRunIdAndStatus(Long batchRunId, PaymentStatus status);
 
     long countByStatus(PaymentStatus status);
+
+    @Query("select distinct f.merchantId from FailedMandate f where f.merchantId is not null and f.merchantId <> ''")
+    List<String> findDistinctMerchantIds();
 }
