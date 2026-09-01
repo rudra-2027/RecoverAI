@@ -80,14 +80,18 @@ class GeminiServiceImplTest {
         when(decisionRepository.findByMandateIdOrderByCreatedAtDesc("MND-0007")).thenReturn(List.of(decision));
         when(recoveryOutcomeRepository.findByMandateIdOrderByOutcomeTimestampDesc("MND-0007")).thenReturn(List.of());
 
-        GeminiServiceImpl service = new GeminiServiceImpl(
-                properties,
+        AiContextServiceImpl aiContextService = new AiContextServiceImpl(
                 failedMandateRepository,
                 decisionRepository,
                 recoveryOutcomeRepository,
                 auditLogRepository,
                 batchRunRepository,
                 metricsService);
+        GeminiServiceImpl service = new GeminiServiceImpl(
+                properties,
+                decisionRepository,
+                batchRunRepository,
+                aiContextService);
 
         String answer = service.answerMerchantQuestion("Why was the latest escalated mandate escalated?");
 
@@ -143,19 +147,93 @@ class GeminiServiceImplTest {
         when(recoveryOutcomeRepository.findByMandateIdOrderByOutcomeTimestampDesc("MND-2026-0007")).thenReturn(List.of());
         when(decisionRepository.findTopByMandateIdOrderByCreatedAtDesc("MND-2026-0007")).thenReturn(Optional.of(decision));
 
-        GeminiServiceImpl service = new GeminiServiceImpl(
-                properties,
+        AiContextServiceImpl aiContextService = new AiContextServiceImpl(
                 failedMandateRepository,
                 decisionRepository,
                 recoveryOutcomeRepository,
                 auditLogRepository,
                 batchRunRepository,
                 metricsService);
+        GeminiServiceImpl service = new GeminiServiceImpl(
+                properties,
+                decisionRepository,
+                batchRunRepository,
+                aiContextService);
 
         String answer = service.answerMerchantQuestion("check mandate id mnd-2026-0007");
 
         assertThat(answer).contains("MND-2026-0007", "RETRY", "RETRY_RECOMMENDED", "72");
         assertThat(answer).doesNotContain("could not identify");
+    }
+
+    @Test
+    void answerMerchantQuestionHandlesAggregateFailureQuestionWithoutMandateId() {
+        RecoverAiProperties properties = new RecoverAiProperties(3, 20, 10, 13, null, null);
+        FailedMandateRepository failedMandateRepository = mock(FailedMandateRepository.class);
+        RecoveryDecisionRepository decisionRepository = mock(RecoveryDecisionRepository.class);
+        RecoveryOutcomeRepository recoveryOutcomeRepository = mock(RecoveryOutcomeRepository.class);
+        AuditLogRepository auditLogRepository = mock(AuditLogRepository.class);
+        BatchRunRepository batchRunRepository = mock(BatchRunRepository.class);
+        MetricsService metricsService = mock(MetricsService.class);
+
+        FailedMandate cardExpired = FailedMandate.builder()
+                .mandateId("M0016")
+                .merchantId("MERCHANT-001")
+                .customerId("CUS-016")
+                .amount(BigDecimal.valueOf(499))
+                .failureReason("CARD_EXPIRED")
+                .failureTimestamp(LocalDateTime.now())
+                .status(PaymentStatus.FAILED)
+                .build();
+        FailedMandate insufficientFunds = FailedMandate.builder()
+                .mandateId("M0017")
+                .merchantId("MERCHANT-001")
+                .customerId("CUS-017")
+                .amount(BigDecimal.valueOf(799))
+                .failureReason("INSUFFICIENT_FUNDS")
+                .failureTimestamp(LocalDateTime.now())
+                .status(PaymentStatus.FAILED)
+                .build();
+
+        when(failedMandateRepository.findAll()).thenReturn(List.of(cardExpired, cardExpired, insufficientFunds));
+        when(decisionRepository.findAll()).thenReturn(List.of());
+        when(recoveryOutcomeRepository.findAll()).thenReturn(List.of());
+        when(failedMandateRepository.count()).thenReturn(3L);
+        when(decisionRepository.count()).thenReturn(0L);
+        when(auditLogRepository.count()).thenReturn(0L);
+        when(recoveryOutcomeRepository.count()).thenReturn(0L);
+        when(batchRunRepository.count()).thenReturn(0L);
+        when(metricsService.calculate()).thenReturn(new com.recoverai.recoverai.dto.MetricsResponse(
+                BigDecimal.ZERO,
+                BigDecimal.valueOf(1797),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                0.0,
+                0.0,
+                BigDecimal.ZERO,
+                0.0,
+                0,
+                0,
+                3,
+                0));
+
+        AiContextServiceImpl aiContextService = new AiContextServiceImpl(
+                failedMandateRepository,
+                decisionRepository,
+                recoveryOutcomeRepository,
+                auditLogRepository,
+                batchRunRepository,
+                metricsService);
+        GeminiServiceImpl service = new GeminiServiceImpl(
+                properties,
+                decisionRepository,
+                batchRunRepository,
+                aiContextService);
+
+        String answer = service.answerMerchantQuestion("What is causing most failures?");
+
+        assertThat(answer).contains("CARD_EXPIRED", "largest payment failure driver");
+        assertThat(answer).doesNotContain("could not identify a specific mandate");
     }
 
     private AuditLog auditLog(Long id, String stage, String message) {

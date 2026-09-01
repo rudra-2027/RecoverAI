@@ -97,7 +97,7 @@ export default function AIInsights() {
   const [messages, setMessages] = useState([
     {
       sender: 'ai',
-      text: 'Ask a question and I will query the RecoverAI backend for the latest operational context.',
+      text: 'Ask about mandates, failures, customers, merchants, batches, retries, revenue, or recovery performance.',
     },
   ]);
 
@@ -338,25 +338,46 @@ export default function AIInsights() {
             {/* Suggested Prompts */}
             <div className="px-stack-md py-stack-sm flex gap-2 overflow-x-auto chat-scroll max-w-full">
               <button 
-                onClick={() => handleSend('Why was the latest escalated mandate escalated?')}
-                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
-              >
-                <span className="material-symbols-outlined text-[14px]">help</span>
-                Why was this mandate escalated?
-              </button>
-              <button 
-                onClick={() => handleSend('What is causing most mandate failures this week?')}
+                onClick={() => handleSend('Why are payments failing?')}
                 className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
               >
                 <span className="material-symbols-outlined text-[14px]">troubleshoot</span>
-                What is causing most failures?
+                Why are payments failing?
               </button>
               <button 
-                onClick={() => handleSend('Which customer portfolios are highest risk?')}
+                onClick={() => handleSend('How is recovery performing?')}
+                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[14px]">monitoring</span>
+                Recovery performance
+              </button>
+              <button 
+                onClick={() => handleSend('How did the latest batch perform?')}
+                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[14px]">summarize</span>
+                Latest batch
+              </button>
+              <button 
+                onClick={() => handleSend('Which customers are highest risk?')}
                 className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
               >
                 <span className="material-symbols-outlined text-[14px]">warning</span>
-                Which customers are highest risk?
+                Highest risk customers
+              </button>
+              <button 
+                onClick={() => handleSend('Which merchants have the most failures?')}
+                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[14px]">storefront</span>
+                Merchant failures
+              </button>
+              <button 
+                onClick={() => handleSend('Check Mandate M0016')}
+                className="font-body-sm text-body-sm text-primary-fixed bg-inverse-surface hover:opacity-90 px-3 py-1.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 border border-outline-variant/20 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[14px]">assignment_late</span>
+                Check M0016
               </button>
             </div>
 
